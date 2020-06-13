@@ -1,7 +1,8 @@
 use crate::{PCCommitment, PCCommitterKey, PCRandomness, PCVerifierKey, Vec};
-use algebra_core::{PairingEngine, ToBytes};
 use core::ops::{Add, AddAssign};
 use rand_core::RngCore;
+use snarkos_models::curves::PairingEngine;
+use snarkos_utilities::bytes::ToBytes;
 
 use crate::kzg10;
 /// `UniversalParams` are the universal parameters for the KZG10 scheme.
@@ -144,7 +145,10 @@ pub struct Commitment<E: PairingEngine> {
 
 impl<E: PairingEngine> ToBytes for Commitment<E> {
     #[inline]
-    fn write<W: algebra_core::io::Write>(&self, mut writer: W) -> algebra_core::io::Result<()> {
+    fn write<W: snarkos_utilities::io::Write>(
+        &self,
+        mut writer: W,
+    ) -> snarkos_utilities::io::Result<()> {
         self.comm.write(&mut writer)?;
         let shifted_exists = self.shifted_comm.is_some();
         shifted_exists.write(&mut writer)?;

@@ -160,4 +160,4 @@ impl core::fmt::Display for Error {
     }
 }
 
-impl algebra_core::Error for Error {}
+impl snarkos_utilities::error::Error for Error {}

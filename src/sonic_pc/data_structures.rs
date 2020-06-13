@@ -1,6 +1,6 @@
 use crate::kzg10;
 use crate::{PCCommitterKey, PCVerifierKey, Vec};
-use algebra_core::PairingEngine;
+use snarkos_models::curves::{PairingCurve, PairingEngine};
 
 /// `UniversalParams` are the universal parameters for the KZG10 scheme.
 pub type UniversalParams<E> = kzg10::UniversalParams<E>;
@@ -117,14 +117,15 @@ pub struct VerifierKey<E: PairingEngine> {
     pub beta_h: E::G2Affine,
 
     /// The generator of G2, prepared for use in pairings.
-    pub prepared_h: E::G2Prepared,
+    pub prepared_h: <E::G2Affine as PairingCurve>::Prepared,
 
     /// The \beta times the generator of G2, prepared for use in pairings.
-    pub prepared_beta_h: E::G2Prepared,
+    pub prepared_beta_h: <E::G2Affine as PairingCurve>::Prepared,
 
     /// Pairs a degree_bound with its corresponding G2 element, which has been prepared for use in pairings.
     /// Each pair is in the form `(degree_bound, \beta^{degree_bound - max_degree} h),` where `h` is the generator of G2 above
-    pub degree_bounds_and_prepared_neg_powers_of_h: Option<Vec<(usize, E::G2Prepared)>>,
+    pub degree_bounds_and_prepared_neg_powers_of_h:
+        Option<Vec<(usize, <E::G2Affine as PairingCurve>::Prepared)>>,
 
     /// The maximum degree supported by the trimmed parameters that `self` is
     /// a part of.
@@ -137,7 +138,10 @@ pub struct VerifierKey<E: PairingEngine> {
 
 impl<E: PairingEngine> VerifierKey<E> {
     /// Find the appropriate shift for the degree bound.
-    pub fn get_shift_power(&self, degree_bound: usize) -> Option<E::G2Prepared> {
+    pub fn get_shift_power(
+        &self,
+        degree_bound: usize,
+    ) -> Option<<E::G2Affine as PairingCurve>::Prepared> {
         self.degree_bounds_and_prepared_neg_powers_of_h
             .as_ref()
             .and_then(|v| {

@@ -3,12 +3,11 @@ use crate::{BatchLCProof, Error, Evaluations, QuerySet};
 use crate::{LabeledCommitment, LabeledPolynomial, LinearCombination};
 use crate::{PCCommitterKey, PCRandomness, PCUniversalParams, Polynomial, PolynomialCommitment};
 
-use algebra_core::{
-    to_bytes, AffineCurve, Field, One, PrimeField, ProjectiveCurve, ToBytes, UniformRand,
-    VariableBaseMSM, Zero,
-};
 use core::{convert::TryInto, marker::PhantomData};
 use rand_core::RngCore;
+use snarkos_algorithms::{cfg_into_iter, cfg_iter, cfg_iter_mut, msm::VariableBaseMSM};
+use snarkos_models::curves::{AffineCurve, Field, Group, One, PrimeField, ProjectiveCurve, Zero};
+use snarkos_utilities::{bytes::ToBytes, log2, rand::UniformRand, to_bytes};
 
 mod data_structures;
 pub use data_structures::*;
@@ -48,7 +47,7 @@ impl<G: AffineCurve, D: Digest> InnerProductArgPC<G, D> {
         hiding_generator: Option<G>,
         randomizer: Option<G::ScalarField>,
     ) -> G::Projective {
-        let scalars_bigint = ff_fft::cfg_iter!(scalars)
+        let scalars_bigint = cfg_iter!(scalars)
             .map(|s| s.into_repr())
             .collect::<Vec<_>>();
 
@@ -66,7 +65,7 @@ impl<G: AffineCurve, D: Digest> InnerProductArgPC<G, D> {
         let mut i = 0u64;
         let mut challenge = None;
         while challenge.is_none() {
-            let hash_input = algebra_core::to_bytes![bytes, i].unwrap();
+            let hash_input = to_bytes![bytes, i].unwrap();
             let hash = D::digest(&hash_input);
             challenge = <G::ScalarField as Field>::from_random_bytes(&hash);
 
@@ -78,7 +77,10 @@ impl<G: AffineCurve, D: Digest> InnerProductArgPC<G, D> {
 
     #[inline]
     fn inner_product(l: &[G::ScalarField], r: &[G::ScalarField]) -> G::ScalarField {
-        ff_fft::cfg_iter!(l).zip(r).map(|(li, ri)| *li * ri).sum()
+        cfg_iter!(l)
+            .zip(r)
+            .map(|(li, ri)| *li * ri)
+            .fold(G::ScalarField::zero(), |acc, x| acc + &x)
     }
 
     /// The succinct portion of `PC::check`. This algorithm runs in time
@@ -96,7 +98,7 @@ impl<G: AffineCurve, D: Digest> InnerProductArgPC<G, D> {
         let d = vk.supported_degree();
 
         // `log_d` is ceil(log2 (d + 1)), which is the number of steps to compute all of the challenges
-        let log_d = algebra_core::log2(d + 1) as usize;
+        let log_d = log2(d + 1) as usize;
 
         let mut combined_commitment_proj = G::Projective::zero();
         let mut combined_v = G::ScalarField::zero();
@@ -131,8 +133,7 @@ impl<G: AffineCurve, D: Digest> InnerProductArgPC<G, D> {
             let rand = proof.rand.unwrap();
 
             let hiding_challenge = Self::compute_random_oracle_challenge(
-                &algebra_core::to_bytes![combined_commitment, point, combined_v, hiding_comm]
-                    .unwrap(),
+                &to_bytes![combined_commitment, point, combined_v, hiding_comm].unwrap(),
             );
             combined_commitment_proj += &(hiding_comm.mul(hiding_challenge) - &vk.s.mul(rand));
             combined_commitment = combined_commitment_proj.into_affine();
@@ -141,20 +142,19 @@ impl<G: AffineCurve, D: Digest> InnerProductArgPC<G, D> {
         // Challenge for each round
         let mut round_challenges = Vec::with_capacity(log_d);
         let mut round_challenge = Self::compute_random_oracle_challenge(
-            &algebra_core::to_bytes![combined_commitment, point, combined_v].unwrap(),
+            &to_bytes![combined_commitment, point, combined_v].unwrap(),
         );
 
         let h_prime = vk.h.mul(round_challenge);
 
-        let mut round_commitment_proj = combined_commitment_proj + &h_prime.mul(combined_v);
+        let mut round_commitment_proj = combined_commitment_proj + &h_prime.mul(&combined_v);
 
         let l_iter = proof.l_vec.iter();
         let r_iter = proof.r_vec.iter();
 
         for (l, r) in l_iter.zip(r_iter) {
-            round_challenge = Self::compute_random_oracle_challenge(
-                &algebra_core::to_bytes![round_challenge, l, r].unwrap(),
-            );
+            round_challenge =
+                Self::compute_random_oracle_challenge(&to_bytes![round_challenge, l, r].unwrap());
             round_challenges.push(round_challenge);
             round_commitment_proj +=
                 &(l.mul(round_challenge.inverse().unwrap()) + &r.mul(round_challenge));
@@ -284,7 +284,7 @@ impl<G: AffineCurve, D: Digest> InnerProductArgPC<G, D> {
     }
 
     fn sample_generators(num_generators: usize) -> Vec<G> {
-        let generators: Vec<_> = ff_fft::cfg_into_iter!(0..num_generators)
+        let generators: Vec<_> = cfg_into_iter!(0..num_generators)
             .map(|i| {
                 let i = i as u64;
                 let mut hash = D::digest(&to_bytes![&Self::PROTOCOL_NAME, i].unwrap());
@@ -529,7 +529,7 @@ impl<G: AffineCurve, D: Digest> PolynomialCommitment<G::ScalarField> for InnerPr
         let d = ck.supported_degree();
 
         // `log_d` is ceil(log2 (d + 1)), which is the number of steps to compute all of the challenges
-        let log_d = algebra_core::log2(d + 1) as usize;
+        let log_d = log2(d + 1) as usize;
 
         let mut combined_commitment;
         let mut hiding_commitment = None;
@@ -557,7 +557,7 @@ impl<G: AffineCurve, D: Digest> PolynomialCommitment<G::ScalarField> for InnerPr
             combined_commitment = batch.pop().unwrap();
 
             let hiding_challenge = Self::compute_random_oracle_challenge(
-                &algebra_core::to_bytes![
+                &to_bytes![
                     combined_commitment,
                     point,
                     combined_v,
@@ -568,7 +568,7 @@ impl<G: AffineCurve, D: Digest> PolynomialCommitment<G::ScalarField> for InnerPr
             combined_polynomial += (hiding_challenge, &hiding_polynomial);
             combined_rand += &(hiding_challenge * &hiding_rand);
             combined_commitment_proj +=
-                &(hiding_commitment_proj.mul(hiding_challenge) - &ck.s.mul(combined_rand));
+                &(hiding_commitment_proj.mul(&hiding_challenge) - &ck.s.mul(combined_rand));
 
             end_timer!(hiding_time);
         }
@@ -586,7 +586,7 @@ impl<G: AffineCurve, D: Digest> PolynomialCommitment<G::ScalarField> for InnerPr
 
         // ith challenge
         let mut round_challenge = Self::compute_random_oracle_challenge(
-            &algebra_core::to_bytes![combined_commitment, point, combined_v].unwrap(),
+            &to_bytes![combined_commitment, point, combined_v].unwrap(),
         );
 
         let h_prime = ck.h.mul(round_challenge).into_affine();
@@ -640,19 +640,19 @@ impl<G: AffineCurve, D: Digest> PolynomialCommitment<G::ScalarField> for InnerPr
             r_vec.push(lr[1]);
 
             round_challenge = Self::compute_random_oracle_challenge(
-                &algebra_core::to_bytes![round_challenge, lr[0], lr[1]].unwrap(),
+                &to_bytes![round_challenge, lr[0], lr[1]].unwrap(),
             );
             let round_challenge_inv = round_challenge.inverse().unwrap();
 
-            ff_fft::cfg_iter_mut!(coeffs_l)
+            cfg_iter_mut!(coeffs_l)
                 .zip(coeffs_r)
                 .for_each(|(c_l, c_r)| *c_l += &(round_challenge_inv * &c_r));
 
-            ff_fft::cfg_iter_mut!(z_l)
+            cfg_iter_mut!(z_l)
                 .zip(z_r)
                 .for_each(|(z_l, z_r)| *z_l += &(round_challenge * &z_r));
 
-            ff_fft::cfg_iter_mut!(key_proj_l)
+            cfg_iter_mut!(key_proj_l)
                 .zip(key_r)
                 .for_each(|(k_l, k_r)| *k_l += &(k_r.mul(round_challenge)));
 
@@ -694,7 +694,7 @@ impl<G: AffineCurve, D: Digest> PolynomialCommitment<G::ScalarField> for InnerPr
         let d = vk.supported_degree();
 
         // `log_d` is ceil(log2 (d + 1)), which is the number of steps to compute all of the challenges
-        let log_d = algebra_core::log2(d + 1) as usize;
+        let log_d = log2(d + 1) as usize;
 
         if proof.l_vec.len() != proof.r_vec.len() || proof.l_vec.len() != log_d {
             return Err(Error::IncorrectInputLength(
@@ -792,7 +792,7 @@ impl<G: AffineCurve, D: Digest> PolynomialCommitment<G::ScalarField> for InnerPr
             let check_poly =
                 Polynomial::from_coefficients_vec(check_poly.unwrap().compute_coeffs());
             combined_check_poly += (randomizer, &check_poly);
-            combined_final_key += &p.final_comm_key.into_projective().mul(randomizer);
+            combined_final_key += &p.final_comm_key.into_projective().mul(&randomizer);
 
             randomizer = u128::rand(rng).into();
             end_timer!(lc_time);
@@ -1015,11 +1015,11 @@ mod tests {
 
     use super::InnerProductArgPC;
 
-    use algebra::jubjub::JubJubAffine;
     use blake2::Blake2s;
+    use snarkos_curves::edwards_bls12::EdwardsAffine;
 
     type PC<E, D> = InnerProductArgPC<E, D>;
-    type PC_JJB2S = PC<JubJubAffine, Blake2s>;
+    type PC_JJB2S = PC<EdwardsAffine, Blake2s>;
 
     #[test]
     fn single_poly_test() {

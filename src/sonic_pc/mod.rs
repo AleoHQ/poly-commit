@@ -4,9 +4,12 @@ use crate::{BatchLCProof, Error, Evaluations, QuerySet};
 use crate::{LabeledCommitment, LabeledPolynomial, LinearCombination};
 use crate::{PCRandomness, PCUniversalParams, Polynomial, PolynomialCommitment};
 
-use algebra_core::{AffineCurve, One, PairingEngine, ProjectiveCurve, UniformRand, Zero};
 use core::{convert::TryInto, marker::PhantomData};
 use rand_core::RngCore;
+use snarkos_models::curves::{
+    AffineCurve, Group, One, PairingCurve, PairingEngine, ProjectiveCurve, Zero,
+};
+use snarkos_utilities::rand::UniformRand;
 
 mod data_structures;
 pub use data_structures::*;
@@ -55,7 +58,7 @@ impl<E: PairingEngine> SonicKZG10<E> {
             let mut comm_with_challenge: E::G1Projective = comm.0.mul(curr_challenge);
 
             if let Some(randomizer) = randomizer {
-                comm_with_challenge = comm_with_challenge.mul(randomizer);
+                comm_with_challenge = comm_with_challenge.mul(&randomizer);
             }
 
             // Accumulate values in the BTreeMap
@@ -73,8 +76,8 @@ impl<E: PairingEngine> SonicKZG10<E> {
         }
 
         if let Some(randomizer) = randomizer {
-            witness = witness.mul(randomizer);
-            adjusted_witness = adjusted_witness.mul(randomizer);
+            witness = witness.mul(&randomizer);
+            adjusted_witness = adjusted_witness.mul(&randomizer);
         }
 
         *combined_witness += &witness;
@@ -90,7 +93,7 @@ impl<E: PairingEngine> SonicKZG10<E> {
     ) -> Result<bool, Error> {
         let check_time = start_timer!(|| "Checking elems");
         let mut g1_projective_elems: Vec<E::G1Projective> = Vec::new();
-        let mut g2_prepared_elems: Vec<E::G2Prepared> = Vec::new();
+        let mut g2_prepared_elems: Vec<<E::G2Affine as PairingCurve>::Prepared> = Vec::new();
 
         for (degree_bound, comm) in combined_comms.into_iter() {
             let shift_power = if let Some(degree_bound) = degree_bound {
@@ -113,10 +116,16 @@ impl<E: PairingEngine> SonicKZG10<E> {
         let g1_prepared_elems_iter =
             E::G1Projective::batch_normalization_into_affine(g1_projective_elems.as_slice())
                 .into_iter()
-                .map(|a| a.into());
+                .map(|a| a.prepare())
+                .collect::<Vec<_>>();
 
-        let g1_g2_prepared: Vec<(E::G1Prepared, E::G2Prepared)> =
-            g1_prepared_elems_iter.zip(g2_prepared_elems).collect();
+        let g1_g2_prepared: Vec<(
+            &<E::G1Affine as PairingCurve>::Prepared,
+            &<E::G2Affine as PairingCurve>::Prepared,
+        )> = g1_prepared_elems_iter
+            .iter()
+            .zip(g2_prepared_elems.iter())
+            .collect::<Vec<_>>();
         let is_one: bool = E::product_of_pairings(g1_g2_prepared.iter()).is_one();
         end_timer!(check_time);
         Ok(is_one)
@@ -520,7 +529,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for SonicKZG10<E> {
                 hiding_bound = core::cmp::max(hiding_bound, cur_poly.hiding_bound());
                 poly += (*coeff, cur_poly.polynomial());
                 randomness += (*coeff, cur_rand);
-                comm += &curr_comm.commitment().0.into_projective().mul(*coeff);
+                comm += &curr_comm.commitment().0.into_projective().mul(coeff);
             }
 
             let lc_poly =
@@ -645,18 +654,15 @@ mod tests {
     #![allow(non_camel_case_types)]
 
     use super::SonicKZG10;
-    use algebra::Bls12_377;
-    use algebra::Bls12_381;
+    use snarkos_curves::bls12_377::Bls12_377;
 
     type PC<E> = SonicKZG10<E>;
     type PC_Bls12_377 = PC<Bls12_377>;
-    type PC_Bls12_381 = PC<Bls12_381>;
 
     #[test]
     fn single_poly_test() {
         use crate::tests::*;
         single_poly_test::<_, PC_Bls12_377>().expect("test failed for bls12-377");
-        single_poly_test::<_, PC_Bls12_381>().expect("test failed for bls12-381");
     }
 
     #[test]
@@ -664,22 +670,18 @@ mod tests {
         use crate::tests::*;
         quadratic_poly_degree_bound_multiple_queries_test::<_, PC_Bls12_377>()
             .expect("test failed for bls12-377");
-        quadratic_poly_degree_bound_multiple_queries_test::<_, PC_Bls12_381>()
-            .expect("test failed for bls12-381");
     }
 
     #[test]
     fn linear_poly_degree_bound_test() {
         use crate::tests::*;
         linear_poly_degree_bound_test::<_, PC_Bls12_377>().expect("test failed for bls12-377");
-        linear_poly_degree_bound_test::<_, PC_Bls12_381>().expect("test failed for bls12-381");
     }
 
     #[test]
     fn single_poly_degree_bound_test() {
         use crate::tests::*;
         single_poly_degree_bound_test::<_, PC_Bls12_377>().expect("test failed for bls12-377");
-        single_poly_degree_bound_test::<_, PC_Bls12_381>().expect("test failed for bls12-381");
     }
 
     #[test]
@@ -687,8 +689,6 @@ mod tests {
         use crate::tests::*;
         single_poly_degree_bound_multiple_queries_test::<_, PC_Bls12_377>()
             .expect("test failed for bls12-377");
-        single_poly_degree_bound_multiple_queries_test::<_, PC_Bls12_381>()
-            .expect("test failed for bls12-381");
     }
 
     #[test]
@@ -696,8 +696,6 @@ mod tests {
         use crate::tests::*;
         two_polys_degree_bound_single_query_test::<_, PC_Bls12_377>()
             .expect("test failed for bls12-377");
-        two_polys_degree_bound_single_query_test::<_, PC_Bls12_381>()
-            .expect("test failed for bls12-381");
     }
 
     #[test]
@@ -705,8 +703,6 @@ mod tests {
         use crate::tests::*;
         full_end_to_end_test::<_, PC_Bls12_377>().expect("test failed for bls12-377");
         println!("Finished bls12-377");
-        full_end_to_end_test::<_, PC_Bls12_381>().expect("test failed for bls12-381");
-        println!("Finished bls12-381");
     }
 
     #[test]
@@ -714,8 +710,6 @@ mod tests {
         use crate::tests::*;
         single_equation_test::<_, PC_Bls12_377>().expect("test failed for bls12-377");
         println!("Finished bls12-377");
-        single_equation_test::<_, PC_Bls12_381>().expect("test failed for bls12-381");
-        println!("Finished bls12-381");
     }
 
     #[test]
@@ -723,8 +717,6 @@ mod tests {
         use crate::tests::*;
         two_equation_test::<_, PC_Bls12_377>().expect("test failed for bls12-377");
         println!("Finished bls12-377");
-        two_equation_test::<_, PC_Bls12_381>().expect("test failed for bls12-381");
-        println!("Finished bls12-381");
     }
 
     #[test]
@@ -732,8 +724,6 @@ mod tests {
         use crate::tests::*;
         two_equation_degree_bound_test::<_, PC_Bls12_377>().expect("test failed for bls12-377");
         println!("Finished bls12-377");
-        two_equation_degree_bound_test::<_, PC_Bls12_381>().expect("test failed for bls12-381");
-        println!("Finished bls12-381");
     }
 
     #[test]
@@ -741,8 +731,6 @@ mod tests {
         use crate::tests::*;
         full_end_to_end_equation_test::<_, PC_Bls12_377>().expect("test failed for bls12-377");
         println!("Finished bls12-377");
-        full_end_to_end_equation_test::<_, PC_Bls12_381>().expect("test failed for bls12-381");
-        println!("Finished bls12-381");
     }
 
     #[test]
@@ -751,7 +739,5 @@ mod tests {
         use crate::tests::*;
         bad_degree_bound_test::<_, PC_Bls12_377>().expect("test failed for bls12-377");
         println!("Finished bls12-377");
-        bad_degree_bound_test::<_, PC_Bls12_381>().expect("test failed for bls12-381");
-        println!("Finished bls12-381");
     }
 }

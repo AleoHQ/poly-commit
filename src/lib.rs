@@ -12,12 +12,14 @@
 
 #[macro_use]
 extern crate derivative;
-#[macro_use]
-extern crate bench_utils;
 
-use algebra_core::Field;
+#[macro_use]
+extern crate snarkos_profiler;
+
+pub use snarkos_algorithms::fft::DensePolynomial as Polynomial;
+use snarkos_models::curves::Field;
+
 use core::iter::FromIterator;
-pub use ff_fft::DensePolynomial as Polynomial;
 use rand_core::RngCore;
 
 #[cfg(not(feature = "std"))]
@@ -131,7 +133,7 @@ pub trait PolynomialCommitment<F: Field>: Sized {
     /// The evaluation proof for a query set.
     type BatchProof: Clone + From<Vec<Self::Proof>> + Into<Vec<Self::Proof>>;
     /// The error type for the scheme.
-    type Error: algebra_core::Error + From<Error>;
+    type Error: snarkos_utilities::error::Error + From<Error>;
 
     /// Constructs public parameters when given as input the maximum degree `degree`
     /// for the polynomial commitment scheme.
@@ -402,7 +404,7 @@ pub trait PolynomialCommitment<F: Field>: Sized {
                             .ok_or(Error::MissingEvaluation { label: l.clone() })?,
                     };
 
-                    actual_rhs += &(*coeff * eval);
+                    actual_rhs += &(*coeff * &eval);
                 }
                 if claimed_rhs != actual_rhs {
                     eprintln!("Claimed evaluation of {} is incorrect", lc.label());
@@ -468,8 +470,9 @@ fn lc_query_set_to_poly_query_set<'a, F: 'a + Field>(
 #[cfg(test)]
 pub mod tests {
     use crate::*;
-    use algebra::{test_rng, Field};
     use rand::{distributions::Distribution, Rng};
+    use snarkos_models::curves::Field;
+    use snarkos_utilities::rand::test_rng;
 
     #[derive(Default)]
     struct TestInfo {
@@ -799,7 +802,7 @@ pub mod tests {
                             } else {
                                 assert!(poly.degree_bound().is_none());
                                 let coeff = F::rand(rng);
-                                value += &(coeff * poly.evaluate(point));
+                                value += &(coeff * &poly.evaluate(point));
                                 lc.push((coeff, label.to_string().into()));
                             }
                         }

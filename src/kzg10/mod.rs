@@ -6,13 +6,17 @@
 //! This construction achieves extractability in the algebraic group model (AGM).
 
 use crate::{Error, LabeledPolynomial, PCRandomness, Polynomial, ToString, Vec};
-use algebra_core::msm::{FixedBaseMSM, VariableBaseMSM};
-use algebra_core::{
-    AffineCurve, Group, One, PairingEngine, PrimeField, ProjectiveCurve, UniformRand, Zero,
-};
 use rand_core::RngCore;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
+use snarkos_algorithms::{
+    cfg_iter,
+    msm::{FixedBaseMSM, VariableBaseMSM},
+};
+use snarkos_models::curves::{
+    AffineCurve, Group, One, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve, Zero,
+};
+use snarkos_utilities::rand::UniformRand;
 
 use core::marker::PhantomData;
 
@@ -100,17 +104,17 @@ impl<E: PairingEngine> KZG10<E> {
             );
 
             let affines = E::G2Projective::batch_normalization_into_affine(&neg_powers_of_h);
-            Some(affines.into_iter().map(|a| a.into()).collect())
+            Some(affines.into_iter().map(|a| a.prepare()).collect())
         } else {
             None
         };
 
         end_timer!(prepared_neg_powers_of_h_time);
 
-        let beta_h = h.mul(beta).into_affine();
+        let beta_h = h.mul(&beta).into_affine();
         let h = h.into_affine();
-        let prepared_h = h.into();
-        let prepared_beta_h = beta_h.into();
+        let prepared_h = h.prepare();
+        let prepared_beta_h = beta_h.prepare();
 
         let pp = UniversalParams {
             powers_of_g,
@@ -288,7 +292,7 @@ impl<E: PairingEngine> KZG10<E> {
         proof: &Proof<E>,
     ) -> Result<bool, Error> {
         let check_time = start_timer!(|| "Checking evaluation");
-        let mut inner = comm.0.into_projective() - &vk.g.into_projective().mul(value);
+        let mut inner = comm.0.into_projective() - &vk.g.into_projective().mul(&value);
         if let Some(random_v) = proof.random_v {
             inner -= &vk.gamma_g.mul(random_v);
         }
@@ -334,14 +338,14 @@ impl<E: PairingEngine> KZG10<E> {
             if let Some(random_v) = proof.random_v {
                 gamma_g_multiplier += &(randomizer * &random_v);
             }
-            total_c += &c.mul(randomizer);
-            total_w += &w.mul(randomizer);
+            total_c += &c.mul(&randomizer);
+            total_w += &w.mul(randomizer.into_repr());
             // We don't need to sample randomizers from the full field,
             // only from 128-bit strings.
             randomizer = u128::rand(rng).into();
         }
-        total_c -= &g.mul(g_multiplier);
-        total_c -= &gamma_g.mul(gamma_g_multiplier);
+        total_c -= &g.mul(&g_multiplier);
+        total_c -= &gamma_g.mul(&gamma_g_multiplier);
         end_timer!(combination_time);
 
         let to_affine_time = start_timer!(|| "Converting results to affine for pairing");
@@ -351,8 +355,8 @@ impl<E: PairingEngine> KZG10<E> {
 
         let pairing_time = start_timer!(|| "Performing product of pairings");
         let result = E::product_of_pairings(&[
-            (total_w.into(), vk.prepared_beta_h.clone()),
-            (total_c.into(), vk.prepared_h.clone()),
+            (&total_w.prepare(), &vk.prepared_beta_h),
+            (&total_c.prepare(), &vk.prepared_h),
         ])
         .is_one();
         end_timer!(pairing_time);
@@ -446,9 +450,7 @@ fn skip_leading_zeros_and_convert_to_bigints<F: PrimeField>(
 
 fn convert_to_bigints<F: PrimeField>(p: &[F]) -> Vec<F::BigInt> {
     let to_bigint_time = start_timer!(|| "Converting polynomial coeffs to bigints");
-    let coeffs = ff_fft::cfg_iter!(p)
-        .map(|s| s.into_repr())
-        .collect::<Vec<_>>();
+    let coeffs = cfg_iter!(p).map(|s| s.into_repr()).collect::<Vec<_>>();
     end_timer!(to_bigint_time);
     coeffs
 }
@@ -459,12 +461,10 @@ mod tests {
     use crate::kzg10::*;
     use crate::*;
 
-    use algebra::bls12_381::Fr;
-    use algebra::test_rng;
-    use algebra::Bls12_377;
-    use algebra::Bls12_381;
+    use snarkos_curves::bls12_377::{Bls12_377, Fr};
+    use snarkos_utilities::rand::test_rng;
 
-    type KZG_Bls12_381 = KZG10<Bls12_381>;
+    type KZG_Bls12_377 = KZG10<Bls12_377>;
 
     impl<E: PairingEngine> KZG10<E> {
         /// Specializes the public parameters for a given maximum degree `d` for polynomials
@@ -510,8 +510,8 @@ mod tests {
         f_p += (f, &p);
 
         let degree = 4;
-        let pp = KZG_Bls12_381::setup(degree, false, rng).unwrap();
-        let (powers, _) = KZG_Bls12_381::trim(&pp, degree).unwrap();
+        let pp = KZG_Bls12_377::setup(degree, false, rng).unwrap();
+        let (powers, _) = KZG_Bls12_377::trim(&pp, degree).unwrap();
 
         let hiding_bound = None;
         let (comm, _) = KZG10::commit(&powers, &p, hiding_bound, Some(rng)).unwrap();
@@ -608,17 +608,14 @@ mod tests {
     #[test]
     fn end_to_end_test() {
         end_to_end_test_template::<Bls12_377>().expect("test failed for bls12-377");
-        end_to_end_test_template::<Bls12_381>().expect("test failed for bls12-381");
     }
 
     #[test]
     fn linear_polynomial_test() {
         linear_polynomial_test_template::<Bls12_377>().expect("test failed for bls12-377");
-        linear_polynomial_test_template::<Bls12_381>().expect("test failed for bls12-381");
     }
     #[test]
     fn batch_check_test() {
         batch_check_test_template::<Bls12_377>().expect("test failed for bls12-377");
-        batch_check_test_template::<Bls12_381>().expect("test failed for bls12-381");
     }
 }

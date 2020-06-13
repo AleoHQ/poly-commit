@@ -1,9 +1,10 @@
 use crate::{Cow, String, Vec};
-use algebra_core::Field;
 use core::borrow::Borrow;
 use core::ops::{AddAssign, MulAssign, SubAssign};
-pub use ff_fft::DensePolynomial as Polynomial;
 use rand_core::RngCore;
+pub use snarkos_algorithms::fft::DensePolynomial as Polynomial;
+use snarkos_models::curves::Field;
+use snarkos_utilities::bytes::ToBytes;
 
 /// Labels a `LabeledPolynomial` or a `LabeledCommitment`.
 pub type PolynomialLabel = String;
@@ -39,7 +40,7 @@ pub trait PCVerifierKey: Clone + core::fmt::Debug {
 
 /// Defines the minimal interface of commitments for any polynomial
 /// commitment scheme.
-pub trait PCCommitment: Clone + algebra_core::ToBytes {
+pub trait PCCommitment: Clone + ToBytes {
     /// Outputs a non-hiding commitment to the zero polynomial.
     fn empty() -> Self;
 
@@ -65,7 +66,7 @@ pub trait PCRandomness: Clone {
 
 /// Defines the minimal interface of evaluation proofs for any polynomial
 /// commitment scheme.
-pub trait PCProof: Clone + algebra_core::ToBytes {
+pub trait PCProof: Clone + ToBytes {
     /// Size in bytes
     fn size_in_bytes(&self) -> usize;
 }
@@ -186,9 +187,12 @@ impl<C: PCCommitment> LabeledCommitment<C> {
     }
 }
 
-impl<C: PCCommitment> algebra_core::ToBytes for LabeledCommitment<C> {
+impl<C: PCCommitment> ToBytes for LabeledCommitment<C> {
     #[inline]
-    fn write<W: algebra_core::io::Write>(&self, writer: W) -> algebra_core::io::Result<()> {
+    fn write<W: snarkos_utilities::io::Write>(
+        &self,
+        writer: W,
+    ) -> snarkos_utilities::io::Result<()> {
         self.commitment.write(writer)
     }
 }
@@ -342,7 +346,7 @@ impl<F: Field> SubAssign<F> for LinearCombination<F> {
 
 impl<F: Field> MulAssign<F> for LinearCombination<F> {
     fn mul_assign(&mut self, coeff: F) {
-        self.terms.iter_mut().for_each(|(c, _)| *c *= coeff);
+        self.terms.iter_mut().for_each(|(c, _)| *c *= &coeff);
     }
 }
 

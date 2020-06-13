@@ -1,6 +1,9 @@
 use crate::*;
-use algebra_core::{AffineCurve, PairingEngine, PrimeField, ProjectiveCurve, ToBytes, Zero};
 use core::ops::{Add, AddAssign};
+use snarkos_models::curves::{
+    AffineCurve, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve, Zero,
+};
+use snarkos_utilities::{bytes::ToBytes, to_bytes};
 
 /// `UniversalParams` are the universal parameters for the KZG10 scheme.
 #[derive(Derivative)]
@@ -15,13 +18,13 @@ pub struct UniversalParams<E: PairingEngine> {
     /// \beta times the above generator of G2.
     pub beta_h: E::G2Affine,
     /// Group elements of the form `{ \beta^i G2 }`, where `i` ranges from `0` to `-degree`.
-    pub prepared_neg_powers_of_h: Option<Vec<E::G2Prepared>>,
+    pub prepared_neg_powers_of_h: Option<Vec<<E::G2Affine as PairingCurve>::Prepared>>,
     /// The generator of G2, prepared for use in pairings.
     #[derivative(Debug = "ignore")]
-    pub prepared_h: E::G2Prepared,
+    pub prepared_h: <E::G2Affine as PairingCurve>::Prepared,
     /// \beta times the above generator of G2, prepared for use in pairings.
     #[derivative(Debug = "ignore")]
-    pub prepared_beta_h: E::G2Prepared,
+    pub prepared_beta_h: <E::G2Affine as PairingCurve>::Prepared,
 }
 
 impl<E: PairingEngine> PCUniversalParams for UniversalParams<E> {
@@ -67,10 +70,10 @@ pub struct VerifierKey<E: PairingEngine> {
     pub beta_h: E::G2Affine,
     /// The generator of G2, prepared for use in pairings.
     #[derivative(Debug = "ignore")]
-    pub prepared_h: E::G2Prepared,
+    pub prepared_h: <E::G2Affine as PairingCurve>::Prepared,
     /// \beta times the above generator of G2, prepared for use in pairings.
     #[derivative(Debug = "ignore")]
-    pub prepared_beta_h: E::G2Prepared,
+    pub prepared_beta_h: <E::G2Affine as PairingCurve>::Prepared,
 }
 
 /// `Commitment` commits to a polynomial. It is output by `KZG10::commit`.
@@ -91,7 +94,10 @@ pub struct Commitment<E: PairingEngine>(
 
 impl<E: PairingEngine> ToBytes for Commitment<E> {
     #[inline]
-    fn write<W: algebra_core::io::Write>(&self, writer: W) -> algebra_core::io::Result<()> {
+    fn write<W: snarkos_utilities::io::Write>(
+        &self,
+        writer: W,
+    ) -> snarkos_utilities::io::Result<()> {
         self.0.write(writer)
     }
 }
@@ -107,7 +113,7 @@ impl<E: PairingEngine> PCCommitment for Commitment<E> {
     }
 
     fn size_in_bytes(&self) -> usize {
-        algebra_core::to_bytes![E::G1Affine::zero()].unwrap().len() / 2
+        to_bytes![E::G1Affine::zero()].unwrap().len() / 2
     }
 }
 
@@ -221,17 +227,20 @@ pub struct Proof<E: PairingEngine> {
 impl<E: PairingEngine> PCProof for Proof<E> {
     fn size_in_bytes(&self) -> usize {
         let hiding_size = if self.random_v.is_some() {
-            algebra_core::to_bytes![E::Fr::zero()].unwrap().len()
+            to_bytes![E::Fr::zero()].unwrap().len()
         } else {
             0
         };
-        algebra_core::to_bytes![E::G1Affine::zero()].unwrap().len() / 2 + hiding_size
+        to_bytes![E::G1Affine::zero()].unwrap().len() / 2 + hiding_size
     }
 }
 
 impl<E: PairingEngine> ToBytes for Proof<E> {
     #[inline]
-    fn write<W: algebra_core::io::Write>(&self, mut writer: W) -> algebra_core::io::Result<()> {
+    fn write<W: snarkos_utilities::io::Write>(
+        &self,
+        mut writer: W,
+    ) -> snarkos_utilities::io::Result<()> {
         self.w.write(&mut writer)?;
         self.random_v
             .as_ref()
