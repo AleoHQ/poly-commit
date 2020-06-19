@@ -2,7 +2,8 @@ use crate::*;
 use crate::{PCCommitterKey, PCVerifierKey, Vec};
 use rand_core::RngCore;
 use snarkos_models::curves::{AffineCurve, Field, Zero};
-use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes};
+use snarkos_utilities::{bytes::ToBytes, rand::UniformRand, to_bytes, serialize::*};
+use snarkos_errors::serialization::SerializationError;
 
 /// `UniversalParams` are the universal parameters for the inner product arg scheme.
 #[derive(Derivative)]
@@ -72,7 +73,7 @@ impl<G: AffineCurve> PCVerifierKey for VerifierKey<G> {
 }
 
 /// Commitment to a polynomial that optionally enforces a degree bound.
-#[derive(Derivative)]
+#[derive(Derivative, CanonicalSerialize)]
 #[derivative(
     Default(bound = ""),
     Hash(bound = ""),
@@ -112,7 +113,7 @@ impl<G: AffineCurve> PCCommitment for Commitment<G> {
 
 impl<G: AffineCurve> ToBytes for Commitment<G> {
     #[inline]
-    fn write<W: snarkos_utilities::io::Write>(
+    fn write<W: Write>(
         &self,
         mut writer: W,
     ) -> snarkos_utilities::io::Result<()> {
@@ -165,7 +166,7 @@ impl<G: AffineCurve> PCRandomness for Randomness<G> {
 }
 
 /// `Proof` is an evaluation proof that is output by `InnerProductArg::open`.
-#[derive(Derivative)]
+#[derive(Derivative, CanonicalSerialize)]
 #[derivative(
     Default(bound = ""),
     Hash(bound = ""),
@@ -202,7 +203,7 @@ impl<G: AffineCurve> PCProof for Proof<G> {
 
 impl<G: AffineCurve> ToBytes for Proof<G> {
     #[inline]
-    fn write<W: snarkos_utilities::io::Write>(
+    fn write<W: Write>(
         &self,
         mut writer: W,
     ) -> snarkos_utilities::io::Result<()> {

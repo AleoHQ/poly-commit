@@ -28,6 +28,7 @@ snarkos-models = { path = "../snarkOS/models", version = "0.8.0" }
 snarkos-algorithms = { path = "../snarkOS/algorithms", version = "0.8.0" }
 snarkos-utilities = { path = "../snarkOS/utilities", version = "0.8.0" }
 snarkos-profiler = { path = "../snarkOS/profiler", version = "0.8.0" }
+snarkos-errors = { path = "../snarkOS/errors", version = "0.8.0" }
 
 [dev-dependencies]
 rand = { version = "0.7", default-features = false }

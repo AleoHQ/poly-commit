@@ -4,7 +4,8 @@ use core::ops::{AddAssign, MulAssign, SubAssign};
 use rand_core::RngCore;
 pub use snarkos_algorithms::fft::DensePolynomial as Polynomial;
 use snarkos_models::curves::Field;
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::{bytes::ToBytes, serialize::*};
+use snarkos_errors::serialization::SerializationError;
 
 /// Labels a `LabeledPolynomial` or a `LabeledCommitment`.
 pub type PolynomialLabel = String;
@@ -40,7 +41,7 @@ pub trait PCVerifierKey: Clone + core::fmt::Debug {
 
 /// Defines the minimal interface of commitments for any polynomial
 /// commitment scheme.
-pub trait PCCommitment: Clone + ToBytes {
+pub trait PCCommitment: Clone + ToBytes + CanonicalSerialize {
     /// Outputs a non-hiding commitment to the zero polynomial.
     fn empty() -> Self;
 
@@ -66,7 +67,7 @@ pub trait PCRandomness: Clone {
 
 /// Defines the minimal interface of evaluation proofs for any polynomial
 /// commitment scheme.
-pub trait PCProof: Clone + ToBytes {
+pub trait PCProof: Clone + ToBytes + CanonicalSerialize {
     /// Size in bytes
     fn size_in_bytes(&self) -> usize;
 }
@@ -187,9 +188,36 @@ impl<C: PCCommitment> LabeledCommitment<C> {
     }
 }
 
+impl<C: PCCommitment> CanonicalSerialize for LabeledCommitment<C> {
+    #[inline]
+    fn serialize<W: Write>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(), SerializationError> {
+        self.commitment.serialize(writer)
+    }
+
+    fn serialized_size(&self) -> usize {
+        self.commitment.serialized_size()
+
+    }
+
+    #[inline]
+    fn serialize_uncompressed<W: Write>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(), SerializationError> {
+        self.commitment.serialize_uncompressed(writer)
+    }
+
+    fn uncompressed_size(&self) -> usize {
+        self.commitment.uncompressed_size()
+    }
+}
+
 impl<C: PCCommitment> ToBytes for LabeledCommitment<C> {
     #[inline]
-    fn write<W: snarkos_utilities::io::Write>(
+    fn write<W: Write>(
         &self,
         writer: W,
     ) -> snarkos_utilities::io::Result<()> {

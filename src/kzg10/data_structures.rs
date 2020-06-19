@@ -3,7 +3,8 @@ use core::ops::{Add, AddAssign};
 use snarkos_models::curves::{
     AffineCurve, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve, Zero,
 };
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_utilities::{bytes::ToBytes, to_bytes, serialize::*};
+use snarkos_errors::serialization::SerializationError;
 
 /// `UniversalParams` are the universal parameters for the KZG10 scheme.
 #[derive(Derivative)]
@@ -77,7 +78,7 @@ pub struct VerifierKey<E: PairingEngine> {
 }
 
 /// `Commitment` commits to a polynomial. It is output by `KZG10::commit`.
-#[derive(Derivative)]
+#[derive(Derivative, CanonicalSerialize)]
 #[derivative(
     Default(bound = ""),
     Hash(bound = ""),
@@ -94,7 +95,7 @@ pub struct Commitment<E: PairingEngine>(
 
 impl<E: PairingEngine> ToBytes for Commitment<E> {
     #[inline]
-    fn write<W: snarkos_utilities::io::Write>(
+    fn write<W: Write>(
         &self,
         writer: W,
     ) -> snarkos_utilities::io::Result<()> {
@@ -206,7 +207,7 @@ impl<'a, E: PairingEngine> AddAssign<(E::Fr, &'a Randomness<E>)> for Randomness<
 }
 
 /// `Proof` is an evaluation proof that is output by `KZG10::open`.
-#[derive(Derivative)]
+#[derive(Derivative, CanonicalSerialize)]
 #[derivative(
     Default(bound = ""),
     Hash(bound = ""),
@@ -237,7 +238,7 @@ impl<E: PairingEngine> PCProof for Proof<E> {
 
 impl<E: PairingEngine> ToBytes for Proof<E> {
     #[inline]
-    fn write<W: snarkos_utilities::io::Write>(
+    fn write<W: Write>(
         &self,
         mut writer: W,
     ) -> snarkos_utilities::io::Result<()> {

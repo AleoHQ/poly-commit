@@ -2,7 +2,8 @@ use crate::{PCCommitment, PCCommitterKey, PCRandomness, PCVerifierKey, Vec};
 use core::ops::{Add, AddAssign};
 use rand_core::RngCore;
 use snarkos_models::curves::PairingEngine;
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::{bytes::ToBytes, serialize::*};
+use snarkos_errors::serialization::SerializationError;
 
 use crate::kzg10;
 /// `UniversalParams` are the universal parameters for the KZG10 scheme.
@@ -128,7 +129,7 @@ impl<E: PairingEngine> PCVerifierKey for VerifierKey<E> {
 }
 
 /// Commitment to a polynomial that optionally enforces a degree bound.
-#[derive(Derivative)]
+#[derive(Derivative, CanonicalSerialize)]
 #[derivative(
     Default(bound = ""),
     Hash(bound = ""),
@@ -145,7 +146,7 @@ pub struct Commitment<E: PairingEngine> {
 
 impl<E: PairingEngine> ToBytes for Commitment<E> {
     #[inline]
-    fn write<W: snarkos_utilities::io::Write>(
+    fn write<W: Write>(
         &self,
         mut writer: W,
     ) -> snarkos_utilities::io::Result<()> {
