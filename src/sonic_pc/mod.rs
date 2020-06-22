@@ -24,6 +24,7 @@ pub use data_structures::*;
 /// [sonic]: https://eprint.iacr.org/2019/099
 /// [al]: https://eprint.iacr.org/2019/601
 /// [marlin]: https://eprint.iacr.org/2019/1047
+#[derive(Clone)]
 pub struct SonicKZG10<E: PairingEngine> {
     _engine: PhantomData<E>,
 }

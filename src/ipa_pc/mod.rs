@@ -30,6 +30,7 @@ use digest::Digest;
 ///
 /// [pcdas]: https://eprint.iacr.org/2020/499
 /// [marlin]: https://eprint.iacr.org/2019/104
+#[derive(Clone)]
 pub struct InnerProductArgPC<G: AffineCurve, D: Digest> {
     _projective: PhantomData<G>,
     _digest: PhantomData<D>,
@@ -304,7 +305,7 @@ impl<G: AffineCurve, D: Digest> InnerProductArgPC<G, D> {
     }
 }
 
-impl<G: AffineCurve, D: Digest> PolynomialCommitment<G::ScalarField> for InnerProductArgPC<G, D> {
+impl<G: AffineCurve, D: Digest + Clone> PolynomialCommitment<G::ScalarField> for InnerProductArgPC<G, D> {
     type UniversalParams = UniversalParams<G>;
     type CommitterKey = CommitterKey<G>;
     type VerifierKey = VerifierKey<G>;

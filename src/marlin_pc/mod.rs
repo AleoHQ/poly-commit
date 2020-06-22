@@ -25,6 +25,7 @@ pub use data_structures::*;
 ///
 /// [kzg]: http://cacr.uwaterloo.ca/techreports/2010/cacr2010-10.pdf
 /// [marlin]: https://eprint.iacr.org/2019/104
+#[derive(Clone)]
 pub struct MarlinKZG10<E: PairingEngine> {
     _engine: PhantomData<E>,
 }

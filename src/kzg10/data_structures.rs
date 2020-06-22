@@ -3,7 +3,10 @@ use core::ops::{Add, AddAssign};
 use snarkos_models::curves::{
     AffineCurve, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve, Zero,
 };
-use snarkos_utilities::{bytes::ToBytes, to_bytes};
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    to_bytes,
+};
 
 /// `UniversalParams` are the universal parameters for the KZG10 scheme.
 #[derive(Derivative)]
@@ -25,6 +28,42 @@ pub struct UniversalParams<E: PairingEngine> {
     /// \beta times the above generator of G2, prepared for use in pairings.
     #[derivative(Debug = "ignore")]
     pub prepared_beta_h: <E::G2Affine as PairingCurve>::Prepared,
+}
+
+impl<E: PairingEngine> FromBytes for UniversalParams<E> {
+    fn read<R: snarkos_utilities::io::Read>(mut reader: R) -> snarkos_utilities::io::Result<Self> {
+        let powers_of_g = Vec::<E::G1Affine>::read(&mut reader)?;
+        let powers_of_gamma_g = Vec::<E::G1Affine>::read(&mut reader)?;
+        let h = E::G2Affine::read(&mut reader)?;
+        let beta_h = E::G2Affine::read(&mut reader)?;
+        let prepared_neg_powers_of_h =
+            Option::<Vec<<E::G2Affine as PairingCurve>::Prepared>>::read(&mut reader)?;
+        let prepared_h = <E::G2Affine as PairingCurve>::Prepared::read(&mut reader)?;
+        let prepared_beta_h = <E::G2Affine as PairingCurve>::Prepared::read(&mut reader)?;
+        Ok(Self {
+            powers_of_g,
+            powers_of_gamma_g,
+            h,
+            beta_h,
+            prepared_neg_powers_of_h,
+            prepared_h,
+            prepared_beta_h,
+        })
+    }
+}
+
+impl<E: PairingEngine> ToBytes for UniversalParams<E> {
+    fn write<W: snarkos_utilities::io::Write>(
+        &self,
+        mut writer: W,
+    ) -> snarkos_utilities::io::Result<()> {
+        self.powers_of_g.write(&mut writer)?;
+        self.h.write(&mut writer)?;
+        self.beta_h.write(&mut writer)?;
+        self.prepared_neg_powers_of_h.write(&mut writer)?;
+        self.prepared_h.write(&mut writer)?;
+        self.prepared_beta_h.write(&mut writer)
+    }
 }
 
 impl<E: PairingEngine> PCUniversalParams for UniversalParams<E> {
@@ -76,6 +115,33 @@ pub struct VerifierKey<E: PairingEngine> {
     pub prepared_beta_h: <E::G2Affine as PairingCurve>::Prepared,
 }
 
+impl<E: PairingEngine> FromBytes for VerifierKey<E> {
+    fn read<R: snarkos_utilities::io::Read>(mut reader: R) -> snarkos_utilities::io::Result<Self> {
+        Ok(Self {
+            g: E::G1Affine::read(&mut reader)?,
+            gamma_g: E::G1Affine::read(&mut reader)?,
+            h: E::G2Affine::read(&mut reader)?,
+            beta_h: E::G2Affine::read(&mut reader)?,
+            prepared_h: <E::G2Affine as PairingCurve>::Prepared::read(&mut reader)?,
+            prepared_beta_h: <E::G2Affine as PairingCurve>::Prepared::read(&mut reader)?,
+        })
+    }
+}
+
+impl<E: PairingEngine> ToBytes for VerifierKey<E> {
+    fn write<W: snarkos_utilities::io::Write>(
+        &self,
+        mut writer: W,
+    ) -> snarkos_utilities::io::Result<()> {
+        self.g.write(&mut writer)?;
+        self.gamma_g.write(&mut writer)?;
+        self.h.write(&mut writer)?;
+        self.beta_h.write(&mut writer)?;
+        self.prepared_h.write(&mut writer)?;
+        self.prepared_beta_h.write(&mut writer)
+    }
+}
+
 /// `Commitment` commits to a polynomial. It is output by `KZG10::commit`.
 #[derive(Derivative)]
 #[derivative(
@@ -99,6 +165,13 @@ impl<E: PairingEngine> ToBytes for Commitment<E> {
         writer: W,
     ) -> snarkos_utilities::io::Result<()> {
         self.0.write(writer)
+    }
+}
+
+impl<E: PairingEngine> FromBytes for Commitment<E> {
+    #[inline]
+    fn read<R: snarkos_utilities::io::Read>(mut reader: R) -> snarkos_utilities::io::Result<Self> {
+        Ok(Self(E::G1Affine::read(&mut reader)?))
     }
 }
 
@@ -205,6 +278,25 @@ impl<'a, E: PairingEngine> AddAssign<(E::Fr, &'a Randomness<E>)> for Randomness<
     }
 }
 
+impl<E: PairingEngine> FromBytes for Randomness<E> {
+    fn read<R: snarkos_utilities::io::Read>(mut reader: R) -> snarkos_utilities::io::Result<Self> {
+        let coeffs = Vec::<E::Fr>::read(&mut reader)?;
+        let blinding_polynomial = Polynomial::<E::Fr> { coeffs };
+        Ok(Self {
+            blinding_polynomial,
+        })
+    }
+}
+
+impl<E: PairingEngine> ToBytes for Randomness<E> {
+    fn write<W: snarkos_utilities::io::Write>(
+        &self,
+        mut writer: W,
+    ) -> snarkos_utilities::io::Result<()> {
+        self.blinding_polynomial.coeffs.write(&mut writer)
+    }
+}
+
 /// `Proof` is an evaluation proof that is output by `KZG10::open`.
 #[derive(Derivative)]
 #[derivative(
@@ -242,9 +334,14 @@ impl<E: PairingEngine> ToBytes for Proof<E> {
         mut writer: W,
     ) -> snarkos_utilities::io::Result<()> {
         self.w.write(&mut writer)?;
-        self.random_v
-            .as_ref()
-            .unwrap_or(&E::Fr::zero())
-            .write(&mut writer)
+        self.random_v.write(&mut writer)
+    }
+}
+
+impl<E: PairingEngine> FromBytes for Proof<E> {
+    fn read<R: snarkos_utilities::io::Read>(mut reader: R) -> snarkos_utilities::io::Result<Self> {
+        let w = E::G1Affine::read(&mut reader)?;
+        let random_v = Option::<E::Fr>::read(&mut reader)?;
+        Ok(Self { w, random_v })
     }
 }

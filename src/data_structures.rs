@@ -4,21 +4,21 @@ use core::ops::{AddAssign, MulAssign, SubAssign};
 use rand_core::RngCore;
 pub use snarkos_algorithms::fft::DensePolynomial as Polynomial;
 use snarkos_models::curves::Field;
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 /// Labels a `LabeledPolynomial` or a `LabeledCommitment`.
 pub type PolynomialLabel = String;
 
 /// Defines the minimal interface for public params for any polynomial
 /// commitment scheme.
-pub trait PCUniversalParams: Clone + core::fmt::Debug {
+pub trait PCUniversalParams: Clone + core::fmt::Debug + FromBytes + ToBytes + Default {
     /// Outputs the maximum degree supported by the committer key.
     fn max_degree(&self) -> usize;
 }
 
 /// Defines the minimal interface of committer keys for any polynomial
 /// commitment scheme.
-pub trait PCCommitterKey: Clone + core::fmt::Debug {
+pub trait PCCommitterKey: Clone + core::fmt::Debug + FromBytes + ToBytes {
     /// Outputs the maximum degree supported by the universal parameters
     /// `Self` was derived from.
     fn max_degree(&self) -> usize;
@@ -29,7 +29,7 @@ pub trait PCCommitterKey: Clone + core::fmt::Debug {
 
 /// Defines the minimal interface of verifier keys for any polynomial
 /// commitment scheme.
-pub trait PCVerifierKey: Clone + core::fmt::Debug {
+pub trait PCVerifierKey: Clone + core::fmt::Debug + FromBytes + ToBytes {
     /// Outputs the maximum degree supported by the universal parameters
     /// `Self` was derived from.
     fn max_degree(&self) -> usize;
@@ -40,7 +40,7 @@ pub trait PCVerifierKey: Clone + core::fmt::Debug {
 
 /// Defines the minimal interface of commitments for any polynomial
 /// commitment scheme.
-pub trait PCCommitment: Clone + ToBytes {
+pub trait PCCommitment: Clone + FromBytes + ToBytes {
     /// Outputs a non-hiding commitment to the zero polynomial.
     fn empty() -> Self;
 
@@ -53,7 +53,7 @@ pub trait PCCommitment: Clone + ToBytes {
 
 /// Defines the minimal interface of commitment randomness for any polynomial
 /// commitment scheme.
-pub trait PCRandomness: Clone {
+pub trait PCRandomness: Clone + FromBytes + ToBytes {
     /// Outputs empty randomness that does not hide the commitment.
     fn empty() -> Self;
 

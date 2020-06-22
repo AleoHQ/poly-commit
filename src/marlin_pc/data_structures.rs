@@ -2,7 +2,7 @@ use crate::{PCCommitment, PCCommitterKey, PCRandomness, PCVerifierKey, Vec};
 use core::ops::{Add, AddAssign};
 use rand_core::RngCore;
 use snarkos_models::curves::PairingEngine;
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::bytes::{FromBytes, ToBytes};
 
 use crate::kzg10;
 /// `UniversalParams` are the universal parameters for the KZG10 scheme.
@@ -87,6 +87,43 @@ impl<E: PairingEngine> PCCommitterKey for CommitterKey<E> {
     }
 }
 
+impl<E: PairingEngine> FromBytes for CommitterKey<E> {
+    fn read<R: snarkos_utilities::io::Read>(mut reader: R) -> snarkos_utilities::io::Result<Self> {
+        let powers = Vec::<E::G1Affine>::read(&mut reader)?;
+        let shifted_powers = Option::<Vec<E::G1Affine>>::read(&mut reader)?;
+        let powers_of_gamma_g = Vec::<E::G1Affine>::read(&mut reader)?;
+        let enforced_degree_bounds = match Option::<Vec<u64>>::read(&mut reader)? {
+            Some(v) => Some(v.iter().map(|x| *x as usize).collect()),
+            _ => None,
+        };
+        let max_degree = u64::read(&mut reader)? as usize;
+        Ok(Self {
+            powers,
+            shifted_powers,
+            powers_of_gamma_g,
+            enforced_degree_bounds,
+            max_degree,
+        })
+    }
+}
+
+impl<E: PairingEngine> ToBytes for CommitterKey<E> {
+    fn write<W: snarkos_utilities::io::Write>(
+        &self,
+        mut writer: W,
+    ) -> snarkos_utilities::io::Result<()> {
+        self.powers.write(&mut writer)?;
+        self.shifted_powers.write(&mut writer)?;
+        self.powers_of_gamma_g.write(&mut writer)?;
+        let transformed_enforced_degree_bounds = match &self.enforced_degree_bounds {
+            Some(v) => Some(v.iter().map(|x| *x as u64).collect::<Vec<_>>()),
+            _ => None,
+        };
+        transformed_enforced_degree_bounds.write(&mut writer)?;
+        (self.max_degree as u64).write(&mut writer)
+    }
+}
+
 /// `VerifierKey` is used to check evaluation proofs for a given commitment.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""), Clone(bound = ""), Debug(bound = ""))]
@@ -104,6 +141,60 @@ pub struct VerifierKey<E: PairingEngine> {
     /// The maximum degree supported by the trimmed parameters that `self` is
     /// a part of.
     pub supported_degree: usize,
+}
+
+impl<E: PairingEngine> FromBytes for VerifierKey<E> {
+    fn read<R: snarkos_utilities::io::Read>(mut reader: R) -> snarkos_utilities::io::Result<Self> {
+        let vk = kzg10::VerifierKey::<E>::read(&mut reader)?;
+        let is_exist = bool::read(&mut reader)?;
+        let degree_bounds_and_shift_powers = if is_exist {
+            let len = u64::read(&mut reader)?;
+            let v = (0..len)
+                .map(|_| {
+                    let d = u64::read(&mut reader)? as usize;
+                    let power = E::G1Affine::read(&mut reader)?;
+                    Ok((d, power))
+                })
+                .collect::<snarkos_utilities::io::Result<Vec<_>>>()?;
+
+            Some(v)
+        } else {
+            None
+        };
+        let max_degree = u64::read(&mut reader)? as usize;
+        let supported_degree = u64::read(&mut reader)? as usize;
+
+        Ok(Self {
+            vk,
+            degree_bounds_and_shift_powers,
+            max_degree,
+            supported_degree,
+        })
+    }
+}
+
+impl<E: PairingEngine> ToBytes for VerifierKey<E> {
+    fn write<W: snarkos_utilities::io::Write>(
+        &self,
+        mut writer: W,
+    ) -> snarkos_utilities::io::Result<()> {
+        self.vk.write(&mut writer)?;
+        match &self.degree_bounds_and_shift_powers {
+            Some(v) => {
+                true.write(&mut writer)?;
+                (v.len() as u64).write(&mut writer)?;
+                for (d, power) in v {
+                    (*d as u64).write(&mut writer)?;
+                    power.write(&mut writer)?;
+                }
+            }
+            _ => {
+                false.write(&mut writer)?;
+            }
+        }
+        (self.max_degree as u64).write(&mut writer)?;
+        (self.supported_degree as u64).write(&mut writer)
+    }
 }
 
 impl<E: PairingEngine> VerifierKey<E> {
@@ -150,12 +241,16 @@ impl<E: PairingEngine> ToBytes for Commitment<E> {
         mut writer: W,
     ) -> snarkos_utilities::io::Result<()> {
         self.comm.write(&mut writer)?;
-        let shifted_exists = self.shifted_comm.is_some();
-        shifted_exists.write(&mut writer)?;
-        self.shifted_comm
-            .as_ref()
-            .unwrap_or(&kzg10::Commitment::empty())
-            .write(&mut writer)
+        self.shifted_comm.write(&mut writer)
+    }
+}
+
+impl<E: PairingEngine> FromBytes for Commitment<E> {
+    #[inline]
+    fn read<R: snarkos_utilities::io::Read>(mut reader: R) -> snarkos_utilities::io::Result<Self> {
+        let comm = kzg10::Commitment::read(&mut reader)?;
+        let shifted_comm = Option::<kzg10::Commitment<E>>::read(&mut reader)?;
+        Ok(Self { comm, shifted_comm })
     }
 }
 
@@ -257,5 +352,23 @@ impl<E: PairingEngine> PCRandomness for Randomness<E> {
             rand: kzg10::Randomness::rand(hiding_bound, false, rng),
             shifted_rand,
         }
+    }
+}
+
+impl<E: PairingEngine> FromBytes for Randomness<E> {
+    fn read<R: snarkos_utilities::io::Read>(mut reader: R) -> snarkos_utilities::io::Result<Self> {
+        let rand = kzg10::Randomness::<E>::read(&mut reader)?;
+        let shifted_rand = Option::<kzg10::Randomness<E>>::read(&mut reader)?;
+        Ok(Self { rand, shifted_rand })
+    }
+}
+
+impl<E: PairingEngine> ToBytes for Randomness<E> {
+    fn write<W: snarkos_utilities::io::Write>(
+        &self,
+        mut writer: W,
+    ) -> snarkos_utilities::io::Result<()> {
+        self.rand.write(&mut writer)?;
+        self.shifted_rand.write(&mut writer)
     }
 }

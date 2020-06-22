@@ -18,6 +18,10 @@ extern crate snarkos_profiler;
 
 pub use snarkos_algorithms::fft::DensePolynomial as Polynomial;
 use snarkos_models::curves::Field;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    io,
+};
 
 use core::iter::FromIterator;
 use rand_core::RngCore;
@@ -82,14 +86,14 @@ pub mod marlin_pc;
 /// [sonic]: https://eprint.iacr.org/2019/099
 /// [al]: https://eprint.iacr.org/2019/601
 /// [marlin]: https://eprint.iacr.org/2019/1047
-pub mod sonic_pc;
+//pub mod sonic_pc;
 
 /// A polynomial commitment scheme based on the hardness of the
 /// discrete logarithm problem in prime-order groups.
 /// The construction is detailed in [[BCMS20]][pcdas].
 ///
 /// [pcdas]: https://eprint.iacr.org/2020/499
-pub mod ipa_pc;
+//pub mod ipa_pc;
 
 /// `QuerySet` is the set of queries that are to be made to a set of labeled polynomials/equations
 /// `p` that have previously been committed to. Each element of a `QuerySet` is a `(label, query)`
@@ -103,6 +107,7 @@ pub type QuerySet<'a, F> = BTreeSet<(String, F)>;
 /// should equal `p[label].evaluate(query)`.
 pub type Evaluations<'a, F> = BTreeMap<(String, F), F>;
 
+#[derive(Clone, Debug)]
 /// A proof of satisfaction of linear combinations.
 pub struct BatchLCProof<F: Field, PC: PolynomialCommitment<F>> {
     /// Evaluation proof.
@@ -111,11 +116,26 @@ pub struct BatchLCProof<F: Field, PC: PolynomialCommitment<F>> {
     pub evals: Option<Vec<F>>,
 }
 
+impl<F: Field, PC: PolynomialCommitment<F>> FromBytes for BatchLCProof<F, PC> {
+    fn read<R: io::Read>(mut reader: R) -> io::Result<Self> {
+        let proof = PC::BatchProof::read(&mut reader)?;
+        let evals = Option::<Vec<F>>::read(&mut reader)?;
+        Ok(Self { proof, evals })
+    }
+}
+
+impl<F: Field, PC: PolynomialCommitment<F>> ToBytes for BatchLCProof<F, PC> {
+    fn write<W: io::Write>(&self, mut writer: W) -> io::Result<()> {
+        self.proof.write(&mut writer)?;
+        self.evals.write(&mut writer)
+    }
+}
+
 /// Describes the interface for a polynomial commitment scheme that allows
 /// a sender to commit to multiple polynomials and later provide a succinct proof
 /// of evaluation for the corresponding commitments at a query set `Q`, while
 /// enforcing per-polynomial degree bounds.
-pub trait PolynomialCommitment<F: Field>: Sized {
+pub trait PolynomialCommitment<F: Field>: Sized + Clone {
     /// The universal parameters for the commitment scheme. These are "trimmed"
     /// down to `Self::CommitterKey` and `Self::VerifierKey` by `Self::trim`.
     type UniversalParams: PCUniversalParams;
@@ -131,7 +151,12 @@ pub trait PolynomialCommitment<F: Field>: Sized {
     /// The evaluation proof for a single point.
     type Proof: PCProof + Clone;
     /// The evaluation proof for a query set.
-    type BatchProof: Clone + From<Vec<Self::Proof>> + Into<Vec<Self::Proof>>;
+    type BatchProof: std::fmt::Debug
+        + Clone
+        + From<Vec<Self::Proof>>
+        + Into<Vec<Self::Proof>>
+        + FromBytes
+        + ToBytes;
     /// The error type for the scheme.
     type Error: snarkos_utilities::error::Error + From<Error>;
 
