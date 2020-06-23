@@ -166,23 +166,20 @@ impl<'a, F: Field> LabeledPolynomial<'a, F> {
 }
 
 /// A commitment along with information about its degree bound (if any).
-#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Clone, CanonicalSerialize)]
 pub struct LabeledCommitment<C: PCCommitment> {
     label: PolynomialLabel,
     commitment: C,
     degree_bound: Option<usize>,
 }
 
-impl<C: PCCommitment> FromBytes for LabeledCommitment<C> {
-    fn read<R: Read>(mut reader: R) -> io::Result<Self> {
-        CanonicalDeserialize::deserialize(&mut reader)
-            .map_err(|_| error_fn("could not deserialize struct"))
-    }
-}
-
+// NOTE: Serializing the LabeledCommitments struct is done by serializing
+// _WITHOUT_ the labels or the degree bound. Deserialization is _NOT_ supported,
+// and you should construct the struct via the `LabeledCommitment::new` method after
+// deserializing the Commitment.
 impl<C: PCCommitment> ToBytes for LabeledCommitment<C> {
     fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
-        CanonicalSerialize::serialize(self, &mut writer)
+        CanonicalSerialize::serialize(&self.commitment, &mut writer)
             .map_err(|_| error_fn("could not serialize struct"))
     }
 }
