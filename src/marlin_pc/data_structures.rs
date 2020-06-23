@@ -166,10 +166,6 @@ impl<E: PairingEngine> PCCommitment for Commitment<E> {
     fn has_degree_bound(&self) -> bool {
         self.shifted_comm.is_some()
     }
-
-    fn size_in_bytes(&self) -> usize {
-        self.comm.size_in_bytes() + self.shifted_comm.as_ref().map_or(0, |c| c.size_in_bytes())
-    }
 }
 
 /// `Randomness` hides the polynomial inside a commitment. It is output by `KZG10::commit`.

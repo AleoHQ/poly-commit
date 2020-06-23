@@ -8,7 +8,6 @@ use snarkos_utilities::{
     bytes::ToBytes,
     error,
     serialize::{CanonicalDeserialize, CanonicalSerialize},
-    to_bytes,
 };
 
 /// `UniversalParams` are the universal parameters for the KZG10 scheme.
@@ -114,10 +113,6 @@ impl<E: PairingEngine> PCCommitment for Commitment<E> {
 
     fn has_degree_bound(&self) -> bool {
         false
-    }
-
-    fn size_in_bytes(&self) -> usize {
-        to_bytes![E::G1Affine::zero()].unwrap().len() / 2
     }
 }
 
@@ -232,13 +227,4 @@ pub struct Proof<E: PairingEngine> {
 }
 delegate!(Proof);
 
-impl<E: PairingEngine> PCProof for Proof<E> {
-    fn size_in_bytes(&self) -> usize {
-        let hiding_size = if self.random_v.is_some() {
-            to_bytes![E::Fr::zero()].unwrap().len()
-        } else {
-            0
-        };
-        to_bytes![E::G1Affine::zero()].unwrap().len() / 2 + hiding_size
-    }
-}
+impl<E: PairingEngine> PCProof for Proof<E> {}

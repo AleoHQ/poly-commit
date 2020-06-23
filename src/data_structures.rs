@@ -58,9 +58,6 @@ pub trait PCCommitment:
 
     /// Does this commitment have a degree bound?
     fn has_degree_bound(&self) -> bool;
-
-    /// Size in bytes
-    fn size_in_bytes(&self) -> usize;
 }
 
 /// Defines the minimal interface of commitment randomness for any polynomial
@@ -78,10 +75,7 @@ pub trait PCRandomness: CanonicalSerialize + CanonicalDeserialize + Clone {
 
 /// Defines the minimal interface of evaluation proofs for any polynomial
 /// commitment scheme.
-pub trait PCProof: CanonicalSerialize + CanonicalDeserialize + Clone + ToBytes {
-    /// Size in bytes
-    fn size_in_bytes(&self) -> usize;
-}
+pub trait PCProof: CanonicalSerialize + CanonicalDeserialize + Clone + ToBytes {}
 
 /// A polynomial along with information about its degree bound (if any), and the
 /// maximum number of queries that will be made to it. This latter number determines
