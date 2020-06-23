@@ -1,24 +1,34 @@
 use crate::{Cow, String, Vec};
-use core::borrow::Borrow;
-use core::ops::{AddAssign, MulAssign, SubAssign};
+use core::{
+    borrow::Borrow,
+    fmt::Debug,
+    ops::{AddAssign, MulAssign, SubAssign},
+};
 use rand_core::RngCore;
 pub use snarkos_algorithms::fft::DensePolynomial as Polynomial;
+use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::Field;
-use snarkos_utilities::bytes::ToBytes;
+use snarkos_utilities::{
+    bytes::{FromBytes, ToBytes},
+    error as error_fn,
+    serialize::*,
+};
 
 /// Labels a `LabeledPolynomial` or a `LabeledCommitment`.
 pub type PolynomialLabel = String;
 
 /// Defines the minimal interface for public params for any polynomial
 /// commitment scheme.
-pub trait PCUniversalParams: Clone + core::fmt::Debug {
+pub trait PCUniversalParams:
+    CanonicalSerialize + CanonicalDeserialize + Clone + Debug + ToBytes + FromBytes
+{
     /// Outputs the maximum degree supported by the committer key.
     fn max_degree(&self) -> usize;
 }
 
 /// Defines the minimal interface of committer keys for any polynomial
 /// commitment scheme.
-pub trait PCCommitterKey: Clone + core::fmt::Debug {
+pub trait PCCommitterKey: CanonicalSerialize + CanonicalDeserialize + Clone + Debug {
     /// Outputs the maximum degree supported by the universal parameters
     /// `Self` was derived from.
     fn max_degree(&self) -> usize;
@@ -29,7 +39,7 @@ pub trait PCCommitterKey: Clone + core::fmt::Debug {
 
 /// Defines the minimal interface of verifier keys for any polynomial
 /// commitment scheme.
-pub trait PCVerifierKey: Clone + core::fmt::Debug {
+pub trait PCVerifierKey: CanonicalSerialize + CanonicalDeserialize + Clone + Debug {
     /// Outputs the maximum degree supported by the universal parameters
     /// `Self` was derived from.
     fn max_degree(&self) -> usize;
@@ -40,7 +50,9 @@ pub trait PCVerifierKey: Clone + core::fmt::Debug {
 
 /// Defines the minimal interface of commitments for any polynomial
 /// commitment scheme.
-pub trait PCCommitment: Clone + ToBytes {
+pub trait PCCommitment:
+    CanonicalDeserialize + CanonicalSerialize + Clone + Debug + ToBytes
+{
     /// Outputs a non-hiding commitment to the zero polynomial.
     fn empty() -> Self;
 
@@ -53,7 +65,7 @@ pub trait PCCommitment: Clone + ToBytes {
 
 /// Defines the minimal interface of commitment randomness for any polynomial
 /// commitment scheme.
-pub trait PCRandomness: Clone {
+pub trait PCRandomness: CanonicalSerialize + CanonicalDeserialize + Clone {
     /// Outputs empty randomness that does not hide the commitment.
     fn empty() -> Self;
 
@@ -66,7 +78,7 @@ pub trait PCRandomness: Clone {
 
 /// Defines the minimal interface of evaluation proofs for any polynomial
 /// commitment scheme.
-pub trait PCProof: Clone + ToBytes {
+pub trait PCProof: CanonicalSerialize + CanonicalDeserialize + Clone + ToBytes {
     /// Size in bytes
     fn size_in_bytes(&self) -> usize;
 }
@@ -74,7 +86,7 @@ pub trait PCProof: Clone + ToBytes {
 /// A polynomial along with information about its degree bound (if any), and the
 /// maximum number of queries that will be made to it. This latter number determines
 /// the amount of protection that will be provided to a commitment for this polynomial.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct LabeledPolynomial<'a, F: Field> {
     label: PolynomialLabel,
     polynomial: Cow<'a, Polynomial<F>>,
@@ -154,11 +166,25 @@ impl<'a, F: Field> LabeledPolynomial<'a, F> {
 }
 
 /// A commitment along with information about its degree bound (if any).
-#[derive(Clone)]
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct LabeledCommitment<C: PCCommitment> {
     label: PolynomialLabel,
     commitment: C,
     degree_bound: Option<usize>,
+}
+
+impl<C: PCCommitment> FromBytes for LabeledCommitment<C> {
+    fn read<R: Read>(mut reader: R) -> io::Result<Self> {
+        CanonicalDeserialize::deserialize(&mut reader)
+            .map_err(|_| error_fn("could not deserialize struct"))
+    }
+}
+
+impl<C: PCCommitment> ToBytes for LabeledCommitment<C> {
+    fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
+        CanonicalSerialize::serialize(self, &mut writer)
+            .map_err(|_| error_fn("could not serialize struct"))
+    }
 }
 
 impl<C: PCCommitment> LabeledCommitment<C> {
@@ -184,16 +210,6 @@ impl<C: PCCommitment> LabeledCommitment<C> {
     /// Retrieve the degree bound in `self`.
     pub fn degree_bound(&self) -> Option<usize> {
         self.degree_bound
-    }
-}
-
-impl<C: PCCommitment> ToBytes for LabeledCommitment<C> {
-    #[inline]
-    fn write<W: snarkos_utilities::io::Write>(
-        &self,
-        writer: W,
-    ) -> snarkos_utilities::io::Result<()> {
-        self.commitment.write(writer)
     }
 }
 
@@ -232,6 +248,7 @@ impl<'a> From<&'a str> for LCTerm {
 
 impl core::convert::TryInto<PolynomialLabel> for LCTerm {
     type Error = ();
+
     fn try_into(self) -> Result<PolynomialLabel, ()> {
         match self {
             Self::One => Err(()),
@@ -284,7 +301,7 @@ impl<F: Field> LinearCombination<F> {
         let terms = terms.into_iter().map(|(c, t)| (c, t.into())).collect();
         Self {
             label: label.into(),
-            terms: terms,
+            terms,
         }
     }
 
