@@ -27,6 +27,7 @@ pub use data_structures::*;
 /// [Kate, Zaverucha and Goldbgerg][kzg10]
 ///
 /// [kzg10]: http://cacr.uwaterloo.ca/techreports/2010/cacr2010-10.pdf
+#[derive(Clone, Debug)]
 pub struct KZG10<E: PairingEngine> {
     _engine: PhantomData<E>,
 }
@@ -458,8 +459,7 @@ fn convert_to_bigints<F: PrimeField>(p: &[F]) -> Vec<F::BigInt> {
 #[cfg(test)]
 mod tests {
     #![allow(non_camel_case_types)]
-    use crate::kzg10::*;
-    use crate::*;
+    use crate::{kzg10::*, *};
 
     use snarkos_curves::bls12_377::{Bls12_377, Fr};
     use snarkos_utilities::rand::test_rng;

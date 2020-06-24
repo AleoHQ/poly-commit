@@ -1,8 +1,8 @@
-use crate::{kzg10, PCCommitterKey};
-use crate::{BTreeMap, BTreeSet, String, ToString, Vec};
-use crate::{BatchLCProof, Error, Evaluations, QuerySet};
-use crate::{LabeledCommitment, LabeledPolynomial, LinearCombination};
-use crate::{PCRandomness, PCUniversalParams, Polynomial, PolynomialCommitment};
+use crate::{
+    kzg10, BTreeMap, BTreeSet, BatchLCProof, Error, Evaluations, LabeledCommitment,
+    LabeledPolynomial, LinearCombination, PCCommitterKey, PCRandomness, PCUniversalParams,
+    Polynomial, PolynomialCommitment, QuerySet, String, ToString, Vec,
+};
 
 use core::{convert::TryInto, marker::PhantomData};
 use rand_core::RngCore;
@@ -25,6 +25,7 @@ pub use data_structures::*;
 ///
 /// [kzg]: http://cacr.uwaterloo.ca/techreports/2010/cacr2010-10.pdf
 /// [marlin]: https://eprint.iacr.org/2019/104
+#[derive(Clone, Debug)]
 pub struct MarlinKZG10<E: PairingEngine> {
     _engine: PhantomData<E>,
 }
@@ -152,14 +153,14 @@ impl<E: PairingEngine> MarlinKZG10<E> {
 }
 
 impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
-    type UniversalParams = UniversalParams<E>;
-    type CommitterKey = CommitterKey<E>;
-    type VerifierKey = VerifierKey<E>;
-    type Commitment = Commitment<E>;
-    type Randomness = Randomness<E>;
-    type Proof = kzg10::Proof<E>;
     type BatchProof = Vec<Self::Proof>;
+    type Commitment = Commitment<E>;
+    type CommitterKey = CommitterKey<E>;
     type Error = Error;
+    type Proof = kzg10::Proof<E>;
+    type Randomness = Randomness<E>;
+    type UniversalParams = UniversalParams<E>;
+    type VerifierKey = VerifierKey<E>;
 
     /// Constructs public parameters when given as input the maximum degree `max_degree`
     /// for the polynomial commitment scheme.
@@ -244,7 +245,7 @@ impl<E: PairingEngine> PolynomialCommitment<E::Fr> for MarlinKZG10<E> {
             powers,
             shifted_powers,
             powers_of_gamma_g,
-            enforced_degree_bounds: enforced_degree_bounds,
+            enforced_degree_bounds,
             max_degree,
         };
 
