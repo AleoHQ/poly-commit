@@ -15,6 +15,14 @@ jobs:
 
     - name: Checkout
       uses: actions/checkout@v1
+   
+    - name: Fetch snarkOS
+      run: |
+        mkdir ~/.ssh
+        echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        cd .. && git clone git@github.com:AleoHQ/snarkOS.git && cd poly-commit
+      
     - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
@@ -42,6 +50,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        
+      - name: Fetch snarkOS
+        run: |
+          mkdir ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          cd .. && git clone git@github.com:AleoHQ/snarkOS.git && cd poly-commit
 
       - name: Install Rust (${{ matrix.rust }})
         uses: actions-rs/toolchain@v1
@@ -82,6 +97,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        
+      - name: Fetch snarkOS
+        run: |
+          mkdir ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          cd .. && git clone git@github.com:AleoHQ/snarkOS.git && cd poly-commit
 
       - name: Install Rust (${{ matrix.rust }})
         uses: actions-rs/toolchain@v1
