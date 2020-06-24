@@ -1,4 +1,4 @@
-use crate::{delegate, PCCommitment, PCCommitterKey, PCRandomness, PCVerifierKey, Vec};
+use crate::{impl_bytes, PCCommitment, PCCommitterKey, PCRandomness, PCVerifierKey, Vec};
 use core::ops::{Add, AddAssign};
 use rand_core::RngCore;
 use snarkos_errors::serialization::SerializationError;
@@ -42,7 +42,7 @@ pub struct CommitterKey<E: PairingEngine> {
     /// from.
     pub max_degree: usize,
 }
-delegate!(CommitterKey);
+impl_bytes!(CommitterKey);
 
 impl<E: PairingEngine> CommitterKey<E> {
     /// Obtain powers for the underlying KZG10 construction
@@ -113,7 +113,7 @@ pub struct VerifierKey<E: PairingEngine> {
     /// a part of.
     pub supported_degree: usize,
 }
-delegate!(VerifierKey);
+impl_bytes!(VerifierKey);
 
 impl<E: PairingEngine> VerifierKey<E> {
     /// Find the appropriate shift for the degree bound.
@@ -152,7 +152,7 @@ pub struct Commitment<E: PairingEngine> {
     pub(crate) comm: kzg10::Commitment<E>,
     pub(crate) shifted_comm: Option<kzg10::Commitment<E>>,
 }
-delegate!(Commitment);
+impl_bytes!(Commitment);
 
 impl<E: PairingEngine> PCCommitment for Commitment<E> {
     #[inline]
@@ -183,7 +183,7 @@ pub struct Randomness<E: PairingEngine> {
     pub(crate) rand: kzg10::Randomness<E>,
     pub(crate) shifted_rand: Option<kzg10::Randomness<E>>,
 }
-delegate!(Randomness);
+impl_bytes!(Randomness);
 
 impl<'a, E: PairingEngine> Add<&'a Self> for Randomness<E> {
     type Output = Self;

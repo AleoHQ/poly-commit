@@ -368,7 +368,7 @@ impl<F: Field> core::ops::Deref for LinearCombination<F> {
 
 /// Helper macro to forward all derived implementations to the ToBytes and FromBytes traits
 #[macro_export]
-macro_rules! delegate {
+macro_rules! impl_bytes {
     ($ty: ident) => {
         impl<E: PairingEngine> FromBytes for $ty<E> {
             fn read<R: Read>(mut reader: R) -> io::Result<Self> {

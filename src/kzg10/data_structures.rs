@@ -1,4 +1,4 @@
-use crate::{delegate, *};
+use crate::{impl_bytes, *};
 use core::ops::{Add, AddAssign};
 use snarkos_errors::serialization::SerializationError;
 use snarkos_models::curves::{
@@ -33,7 +33,7 @@ pub struct UniversalParams<E: PairingEngine> {
     pub prepared_beta_h: <E::G2Affine as PairingCurve>::Prepared,
 }
 
-delegate!(UniversalParams);
+impl_bytes!(UniversalParams);
 
 impl<E: PairingEngine> PCUniversalParams for UniversalParams<E> {
     fn max_degree(&self) -> usize {
@@ -84,7 +84,7 @@ pub struct VerifierKey<E: PairingEngine> {
     #[derivative(Debug = "ignore")]
     pub prepared_beta_h: <E::G2Affine as PairingCurve>::Prepared,
 }
-delegate!(VerifierKey);
+impl_bytes!(VerifierKey);
 
 /// `Commitment` commits to a polynomial. It is output by `KZG10::commit`.
 #[derive(Derivative)]
@@ -103,7 +103,7 @@ pub struct Commitment<E: PairingEngine>(
     pub E::G1Affine,
 );
 
-delegate!(Commitment);
+impl_bytes!(Commitment);
 
 impl<E: PairingEngine> PCCommitment for Commitment<E> {
     #[inline]
@@ -140,7 +140,7 @@ pub struct Randomness<E: PairingEngine> {
     /// For KZG10, the commitment randomness is a random polynomial.
     pub blinding_polynomial: Polynomial<E::Fr>,
 }
-delegate!(Randomness);
+impl_bytes!(Randomness);
 
 impl<E: PairingEngine> Randomness<E> {
     /// Does `self` provide any hiding properties to the corresponding commitment?
@@ -225,6 +225,6 @@ pub struct Proof<E: PairingEngine> {
     /// the evaluation proof was produced.
     pub random_v: Option<E::Fr>,
 }
-delegate!(Proof);
+impl_bytes!(Proof);
 
 impl<E: PairingEngine> PCProof for Proof<E> {}
