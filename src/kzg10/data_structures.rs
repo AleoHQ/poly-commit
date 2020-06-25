@@ -1,9 +1,7 @@
 use crate::{impl_bytes, *};
 use core::ops::{Add, AddAssign};
 use snarkos_errors::serialization::SerializationError;
-use snarkos_models::curves::{
-    AffineCurve, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve, Zero,
-};
+use snarkos_models::curves::{AffineCurve, PairingCurve, PairingEngine, PrimeField, ProjectiveCurve, Zero};
 use snarkos_utilities::{
     bytes::ToBytes,
     error,
@@ -44,12 +42,7 @@ impl<E: PairingEngine> PCUniversalParams for UniversalParams<E> {
 /// `Powers` is used to commit to and create evaluation proofs for a given
 /// polynomial.
 #[derive(Derivative)]
-#[derivative(
-    Default(bound = ""),
-    Hash(bound = ""),
-    Clone(bound = ""),
-    Debug(bound = "")
-)]
+#[derivative(Default(bound = ""), Hash(bound = ""), Clone(bound = ""), Debug(bound = ""))]
 pub struct Powers<'a, E: PairingEngine> {
     /// Group elements of the form `β^i G`, for different values of `i`.
     pub powers_of_g: Cow<'a, [E::G1Affine]>,

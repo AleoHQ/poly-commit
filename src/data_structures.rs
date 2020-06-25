@@ -19,9 +19,7 @@ pub type PolynomialLabel = String;
 
 /// Defines the minimal interface for public params for any polynomial
 /// commitment scheme.
-pub trait PCUniversalParams:
-    CanonicalSerialize + CanonicalDeserialize + Clone + Debug + ToBytes + FromBytes
-{
+pub trait PCUniversalParams: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + ToBytes + FromBytes {
     /// Outputs the maximum degree supported by the committer key.
     fn max_degree(&self) -> usize;
 }
@@ -50,9 +48,7 @@ pub trait PCVerifierKey: CanonicalSerialize + CanonicalDeserialize + Clone + Deb
 
 /// Defines the minimal interface of commitments for any polynomial
 /// commitment scheme.
-pub trait PCCommitment:
-    CanonicalDeserialize + CanonicalSerialize + Clone + Debug + ToBytes
-{
+pub trait PCCommitment: CanonicalDeserialize + CanonicalSerialize + Clone + Debug + ToBytes {
     /// Outputs a non-hiding commitment to the zero polynomial.
     fn empty() -> Self;
 
@@ -173,8 +169,7 @@ pub struct LabeledCommitment<C: PCCommitment> {
 // deserializing the Commitment.
 impl<C: PCCommitment> ToBytes for LabeledCommitment<C> {
     fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
-        CanonicalSerialize::serialize(&self.commitment, &mut writer)
-            .map_err(|_| error_fn("could not serialize struct"))
+        CanonicalSerialize::serialize(&self.commitment, &mut writer).map_err(|_| error_fn("could not serialize struct"))
     }
 }
 
@@ -217,11 +212,7 @@ impl LCTerm {
     /// Returns `true` if `self == LCTerm::One`
     #[inline]
     pub fn is_one(&self) -> bool {
-        if let LCTerm::One = self {
-            true
-        } else {
-            false
-        }
+        if let LCTerm::One = self { true } else { false }
     }
 }
 
@@ -335,8 +326,7 @@ impl<'a, F: Field> AddAssign<&'a LinearCombination<F>> for LinearCombination<F> 
 
 impl<'a, F: Field> SubAssign<&'a LinearCombination<F>> for LinearCombination<F> {
     fn sub_assign(&mut self, other: &'a LinearCombination<F>) {
-        self.terms
-            .extend(other.terms.iter().map(|(c, t)| (-*c, t.clone())));
+        self.terms.extend(other.terms.iter().map(|(c, t)| (-*c, t.clone())));
     }
 }
 
@@ -372,15 +362,13 @@ macro_rules! impl_bytes {
     ($ty: ident) => {
         impl<E: PairingEngine> FromBytes for $ty<E> {
             fn read<R: Read>(mut reader: R) -> io::Result<Self> {
-                CanonicalDeserialize::deserialize(&mut reader)
-                    .map_err(|_| error("could not deserialize struct"))
+                CanonicalDeserialize::deserialize(&mut reader).map_err(|_| error("could not deserialize struct"))
             }
         }
 
         impl<E: PairingEngine> ToBytes for $ty<E> {
             fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
-                CanonicalSerialize::serialize(self, &mut writer)
-                    .map_err(|_| error("could not serialize struct"))
+                CanonicalSerialize::serialize(self, &mut writer).map_err(|_| error("could not serialize struct"))
             }
         }
     };

@@ -101,15 +101,13 @@ pub struct BatchLCProof<F: Field, PC: PolynomialCommitment<F>> {
 
 impl<F: Field, PC: PolynomialCommitment<F>> FromBytes for BatchLCProof<F, PC> {
     fn read<R: Read>(mut reader: R) -> io::Result<Self> {
-        CanonicalDeserialize::deserialize(&mut reader)
-            .map_err(|_| error_fn("could not deserialize struct"))
+        CanonicalDeserialize::deserialize(&mut reader).map_err(|_| error_fn("could not deserialize struct"))
     }
 }
 
 impl<F: Field, PC: PolynomialCommitment<F>> ToBytes for BatchLCProof<F, PC> {
     fn write<W: Write>(&self, mut writer: W) -> io::Result<()> {
-        CanonicalSerialize::serialize(self, &mut writer)
-            .map_err(|_| error_fn("could not serialize struct"))
+        CanonicalSerialize::serialize(self, &mut writer).map_err(|_| error_fn("could not serialize struct"))
     }
 }
 
@@ -144,10 +142,7 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
 
     /// Constructs public parameters when given as input the maximum degree `degree`
     /// for the polynomial commitment scheme.
-    fn setup<R: RngCore>(
-        max_degree: usize,
-        rng: &mut R,
-    ) -> Result<Self::UniversalParams, Self::Error>;
+    fn setup<R: RngCore>(max_degree: usize, rng: &mut R) -> Result<Self::UniversalParams, Self::Error>;
 
     /// Specializes the public parameters for polynomials up to the given `supported_degree`
     /// and for enforcing degree bounds in the range `1..=supported_degree`.
@@ -170,13 +165,7 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
         ck: &Self::CommitterKey,
         polynomials: impl IntoIterator<Item = &'a LabeledPolynomial<'a, F>>,
         rng: Option<&mut dyn RngCore>,
-    ) -> Result<
-        (
-            Vec<LabeledCommitment<Self::Commitment>>,
-            Vec<Self::Randomness>,
-        ),
-        Self::Error,
-    >;
+    ) -> Result<(Vec<LabeledCommitment<Self::Commitment>>, Vec<Self::Randomness>), Self::Error>;
 
     /// On input a list of labeled polynomials and a query point, `open` outputs a proof of evaluation
     /// of the polynomials at the query point.
@@ -236,10 +225,9 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
             let mut query_comms: Vec<&'a LabeledCommitment<Self::Commitment>> = Vec::new();
 
             for label in labels {
-                let (polynomial, rand, comm) =
-                    poly_rand_comm.get(label).ok_or(Error::MissingPolynomial {
-                        label: label.to_string(),
-                    })?;
+                let (polynomial, rand, comm) = poly_rand_comm.get(label).ok_or(Error::MissingPolynomial {
+                    label: label.to_string(),
+                })?;
 
                 query_polys.push(polynomial);
                 query_rands.push(rand);
@@ -315,12 +303,11 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
                     label: label.to_string(),
                 })?;
 
-                let v_i =
-                    evaluations
-                        .get(&(label.clone(), *query))
-                        .ok_or(Error::MissingEvaluation {
-                            label: label.to_string(),
-                        })?;
+                let v_i = evaluations
+                    .get(&(label.clone(), *query))
+                    .ok_or(Error::MissingEvaluation {
+                        label: label.to_string(),
+                    })?;
 
                 comms.push(commitment);
                 values.push(*v_i);
@@ -352,8 +339,7 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
     {
         let linear_combinations: Vec<_> = linear_combinations.into_iter().collect();
         let polynomials: Vec<_> = polynomials.into_iter().collect();
-        let poly_query_set =
-            lc_query_set_to_poly_query_set(linear_combinations.iter().copied(), query_set);
+        let poly_query_set = lc_query_set_to_poly_query_set(linear_combinations.iter().copied(), query_set);
         let poly_evals = evaluate_query_set(polynomials.iter().copied(), &poly_query_set);
         let proof = Self::batch_open(
             ck,
@@ -390,16 +376,15 @@ pub trait PolynomialCommitment<F: Field>: Sized + Clone + Debug {
         let lc_s = BTreeMap::from_iter(linear_combinations.into_iter().map(|lc| (lc.label(), lc)));
 
         let poly_query_set = lc_query_set_to_poly_query_set(lc_s.values().copied(), eqn_query_set);
-        let poly_evals =
-            Evaluations::from_iter(poly_query_set.iter().cloned().zip(evals.clone().unwrap()));
+        let poly_evals = Evaluations::from_iter(poly_query_set.iter().cloned().zip(evals.clone().unwrap()));
 
         for &(ref lc_label, point) in eqn_query_set {
             if let Some(lc) = lc_s.get(lc_label) {
-                let claimed_rhs = *eqn_evaluations.get(&(lc_label.clone(), point)).ok_or(
-                    Error::MissingEvaluation {
+                let claimed_rhs = *eqn_evaluations
+                    .get(&(lc_label.clone(), point))
+                    .ok_or(Error::MissingEvaluation {
                         label: lc_label.to_string(),
-                    },
-                )?;
+                    })?;
 
                 let mut actual_rhs = F::zero();
 
@@ -446,9 +431,7 @@ pub fn evaluate_query_set<'a, F: Field>(
     let polys = BTreeMap::from_iter(polys.into_iter().map(|p| (p.label(), p)));
     let mut evaluations = Evaluations::new();
     for (label, point) in query_set {
-        let poly = polys
-            .get(label)
-            .expect("polynomial in evaluated lc is not found");
+        let poly = polys.get(label).expect("polynomial in evaluated lc is not found");
         let eval = poly.evaluate(*point);
         evaluations.insert((label.clone(), *point), eval);
     }
@@ -503,10 +486,7 @@ pub mod tests {
 
         for _ in 0..10 {
             let supported_degree = rand::distributions::Uniform::from(1..=max_degree).sample(rng);
-            assert!(
-                max_degree >= supported_degree,
-                "max_degree < supported_degree"
-            );
+            assert!(max_degree >= supported_degree, "max_degree < supported_degree");
 
             let mut labels = Vec::new();
             let mut polynomials = Vec::new();
@@ -555,15 +535,7 @@ pub mod tests {
                 &rands,
                 Some(rng),
             )?;
-            let result = PC::batch_check(
-                &vk,
-                &comms,
-                &query_set,
-                &values,
-                &proof,
-                opening_challenge,
-                rng,
-            )?;
+            let result = PC::batch_check(&vk, &comms, &query_set, &values, &proof, opening_challenge, rng)?;
             assert!(result, "proof was incorrect, Query set: {:#?}", query_set);
         }
         Ok(())
@@ -585,30 +557,21 @@ pub mod tests {
         } = info;
 
         let rng = &mut test_rng();
-        let max_degree =
-            max_degree.unwrap_or(rand::distributions::Uniform::from(2..=64).sample(rng));
+        let max_degree = max_degree.unwrap_or(rand::distributions::Uniform::from(2..=64).sample(rng));
         let pp = PC::setup(max_degree, rng)?;
 
         for _ in 0..num_iters {
-            let supported_degree = supported_degree
-                .unwrap_or(rand::distributions::Uniform::from(1..=max_degree).sample(rng));
-            assert!(
-                max_degree >= supported_degree,
-                "max_degree < supported_degree"
-            );
+            let supported_degree =
+                supported_degree.unwrap_or(rand::distributions::Uniform::from(1..=max_degree).sample(rng));
+            assert!(max_degree >= supported_degree, "max_degree < supported_degree");
             let mut polynomials = Vec::new();
-            let mut degree_bounds = if enforce_degree_bounds {
-                Some(Vec::new())
-            } else {
-                None
-            };
+            let mut degree_bounds = if enforce_degree_bounds { Some(Vec::new()) } else { None };
 
             let mut labels = Vec::new();
             println!("Sampled supported degree");
 
             // Generate polynomials
-            let num_points_in_query_set =
-                rand::distributions::Uniform::from(1..=max_num_queries).sample(rng);
+            let num_points_in_query_set = rand::distributions::Uniform::from(1..=max_num_queries).sample(rng);
             for i in 0..num_polynomials {
                 let label = format!("Test{}", i);
                 labels.push(label.clone());
@@ -631,20 +594,11 @@ pub mod tests {
                 };
                 println!("Hiding bound: {:?}", hiding_bound);
 
-                polynomials.push(LabeledPolynomial::new_owned(
-                    label,
-                    poly,
-                    degree_bound,
-                    hiding_bound,
-                ))
+                polynomials.push(LabeledPolynomial::new_owned(label, poly, degree_bound, hiding_bound))
             }
             println!("supported degree: {:?}", supported_degree);
             println!("num_points_in_query_set: {:?}", num_points_in_query_set);
-            let (ck, vk) = PC::trim(
-                &pp,
-                supported_degree,
-                degree_bounds.as_ref().map(|s| s.as_slice()),
-            )?;
+            let (ck, vk) = PC::trim(&pp, supported_degree, degree_bounds.as_ref().map(|s| s.as_slice()))?;
             println!("Trimmed");
 
             let (comms, rands) = PC::commit(&ck, &polynomials, Some(rng))?;
@@ -673,15 +627,7 @@ pub mod tests {
                 &rands,
                 Some(rng),
             )?;
-            let result = PC::batch_check(
-                &vk,
-                &comms,
-                &query_set,
-                &values,
-                &proof,
-                opening_challenge,
-                rng,
-            )?;
+            let result = PC::batch_check(&vk, &comms, &query_set, &values, &proof, opening_challenge, rng)?;
             if !result {
                 println!(
                     "Failed with {} polynomials, num_points_in_query_set: {:?}",
@@ -713,30 +659,21 @@ pub mod tests {
         } = info;
 
         let rng = &mut test_rng();
-        let max_degree =
-            max_degree.unwrap_or(rand::distributions::Uniform::from(2..=64).sample(rng));
+        let max_degree = max_degree.unwrap_or(rand::distributions::Uniform::from(2..=64).sample(rng));
         let pp = PC::setup(max_degree, rng)?;
 
         for _ in 0..num_iters {
-            let supported_degree = supported_degree
-                .unwrap_or(rand::distributions::Uniform::from(1..=max_degree).sample(rng));
-            assert!(
-                max_degree >= supported_degree,
-                "max_degree < supported_degree"
-            );
+            let supported_degree =
+                supported_degree.unwrap_or(rand::distributions::Uniform::from(1..=max_degree).sample(rng));
+            assert!(max_degree >= supported_degree, "max_degree < supported_degree");
             let mut polynomials = Vec::new();
-            let mut degree_bounds = if enforce_degree_bounds {
-                Some(Vec::new())
-            } else {
-                None
-            };
+            let mut degree_bounds = if enforce_degree_bounds { Some(Vec::new()) } else { None };
 
             let mut labels = Vec::new();
             println!("Sampled supported degree");
 
             // Generate polynomials
-            let num_points_in_query_set =
-                rand::distributions::Uniform::from(1..=max_num_queries).sample(rng);
+            let num_points_in_query_set = rand::distributions::Uniform::from(1..=max_num_queries).sample(rng);
             for i in 0..num_polynomials {
                 let label = format!("Test{}", i);
                 labels.push(label.clone());
@@ -763,12 +700,7 @@ pub mod tests {
                 };
                 println!("Hiding bound: {:?}", hiding_bound);
 
-                polynomials.push(LabeledPolynomial::new_owned(
-                    label,
-                    poly,
-                    degree_bound,
-                    hiding_bound,
-                ))
+                polynomials.push(LabeledPolynomial::new_owned(label, poly, degree_bound, hiding_bound))
             }
             println!("supported degree: {:?}", supported_degree);
             println!("num_points_in_query_set: {:?}", num_points_in_query_set);
@@ -776,11 +708,7 @@ pub mod tests {
             println!("{}", num_polynomials);
             println!("{}", enforce_degree_bounds);
 
-            let (ck, vk) = PC::trim(
-                &pp,
-                supported_degree,
-                degree_bounds.as_ref().map(|s| s.as_slice()),
-            )?;
+            let (ck, vk) = PC::trim(&pp, supported_degree, degree_bounds.as_ref().map(|s| s.as_slice()))?;
             println!("Trimmed");
 
             let (comms, rands) = PC::commit(&ck, &polynomials, Some(rng))?;
@@ -860,11 +788,7 @@ pub mod tests {
                     println!("Degree: {:?}", poly.degree());
                 }
             }
-            assert!(
-                result,
-                "proof was incorrect, equations: {:#?}",
-                linear_combinations
-            );
+            assert!(result, "proof was incorrect, equations: {:#?}", linear_combinations);
         }
         Ok(())
     }
