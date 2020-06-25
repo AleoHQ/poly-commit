@@ -18,11 +18,11 @@ jobs:
    
     - name: Fetch snarkOS
       run: |
-        mkdir ~/.ssh
-        echo "${{ secrets.SNARKOS_DEPLOY_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        eval $(ssh-agent -s)
-        ssh-add -K ~/.ssh/id_rsa
+      mkdir ~/.ssh
+      echo "${{ secrets.SNARKOS_DEPLOY_KEY }}" > ~/.ssh/id_rsa
+      chmod 600 ~/.ssh/id_rsa
+      eval $(ssh-agent -s)
+      ssh-add -K ~/.ssh/id_rsa
       
     - name: Install Rust
       uses: actions-rs/toolchain@v1
@@ -34,6 +34,8 @@ jobs:
 
     - name: cargo fmt --check
       uses: actions-rs/cargo@v1
+      env:
+        CARGO_NET_GIT_FETCH_WITH_CLI: true
       with:
         command: fmt
         args: --all -- --check
@@ -69,12 +71,16 @@ jobs:
 
       - name: Check examples
         uses: actions-rs/cargo@v1
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
         with:
             command: check
             args: --examples --all
 
       - name: Check examples with all features on stable
         uses: actions-rs/cargo@v1
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
         with:
             command: check
             args: --examples --all-features --all
@@ -82,6 +88,8 @@ jobs:
 
       - name: Check benchmarks on nightly
         uses: actions-rs/cargo@v1
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
         with:
             command: check
             args: --all-features --examples --all --benches
@@ -89,6 +97,8 @@ jobs:
 
       - name: Test
         uses: actions-rs/cargo@v1
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
         with:
             command: test
             args: --release
@@ -117,6 +127,8 @@ jobs:
 #
 #      - name: Build
 #        uses: actions-rs/cargo@v1
+#        env:
+#          CARGO_NET_GIT_FETCH_WITH_CLI: true
 #        with:
 #          use-cross: true
 #          command: build
@@ -124,6 +136,8 @@ jobs:
 #
 #      - name: Check
 #        uses: actions-rs/cargo@v1
+#        env:
+#          CARGO_NET_GIT_FETCH_WITH_CLI: true
 #        with:
 #          use-cross: true
 #          command: check
